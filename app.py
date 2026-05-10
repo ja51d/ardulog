@@ -93,27 +93,36 @@ QMainWindow, QWidget {{
 QMenuBar {{
     background: {BG_0};
     border-bottom: 1px solid {BORDER};
-    padding: 2px 6px;
+    padding: 3px 8px;
 }}
 QMenuBar::item {{
     background: transparent;
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 4px;
 }}
-QMenuBar::item:selected {{ background: {BG_2}; }}
+QMenuBar::item:selected {{ background: {BG_2}; color: {ACCENT}; }}
 QMenu {{
     background: {BG_1};
     border: 1px solid {BORDER};
-    padding: 4px;
-    border-radius: 6px;
+    padding: 6px;
+    border-radius: 8px;
 }}
-QMenu::item {{ padding: 6px 18px; border-radius: 4px; }}
+QMenu::item {{ padding: 7px 22px; border-radius: 5px; }}
 QMenu::item:selected {{ background: {BG_3}; color: {ACCENT}; }}
+QMenu::separator {{
+    height: 1px;
+    background: {BORDER};
+    margin: 4px 6px;
+}}
 
 QStatusBar {{
     background: {BG_0};
     border-top: 1px solid {BORDER};
     color: {TEXT_DIM};
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    min-height: 26px;
 }}
 QStatusBar::item {{ border: none; }}
 
@@ -121,40 +130,54 @@ QSplitter::handle {{
     background: {BORDER};
     width: 1px;
 }}
+QSplitter::handle:hover {{ background: {ACCENT}; }}
 
 QLineEdit {{
     background: {BG_2};
     border: 1px solid {BORDER};
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 7px 12px;
     selection-background-color: {ACCENT};
     selection-color: {BG_0};
 }}
-QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
+QLineEdit:focus {{
+    border: 1px solid {ACCENT};
+    background: {BG_3};
+}}
 
 QTreeWidget {{
     background: {BG_1};
     border: 1px solid {BORDER};
     border-radius: 8px;
     outline: 0;
-    padding: 4px;
+    padding: 6px;
 }}
 QTreeWidget::item {{
-    padding: 4px 6px;
+    padding: 5px 6px;
     border-radius: 4px;
+    border: 1px solid transparent;
 }}
 QTreeWidget::item:hover {{ background: {BG_2}; }}
-QTreeWidget::item:selected {{ background: {BG_3}; color: {ACCENT}; }}
+QTreeWidget::item:selected {{
+    background: {BG_3};
+    color: {ACCENT};
+    border: 1px solid {ACCENT};
+}}
+QTreeWidget::branch:has-children:!has-siblings:closed,
+QTreeWidget::branch:closed:has-children:has-siblings {{
+    image: none;
+    border-image: none;
+}}
 QHeaderView::section {{
     background: {BG_1};
     color: {TEXT_DIM};
-    padding: 6px 8px;
+    padding: 8px 10px;
     border: none;
     border-bottom: 1px solid {BORDER};
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    font-size: 11px;
-    letter-spacing: 0.5px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
 }}
 QTreeView::indicator {{
     width: 14px; height: 14px;
@@ -162,6 +185,7 @@ QTreeView::indicator {{
     border-radius: 3px;
     background: {BG_2};
 }}
+QTreeView::indicator:hover {{ border: 1px solid {ACCENT}; }}
 QTreeView::indicator:checked {{
     background: {ACCENT};
     border: 1px solid {ACCENT};
@@ -170,73 +194,104 @@ QTreeView::indicator:checked {{
 
 QTabWidget::pane {{
     border: 1px solid {BORDER};
-    border-radius: 8px;
+    border-radius: 10px;
     top: -1px;
     background: {BG_1};
 }}
 QTabBar::tab {{
     background: transparent;
     color: {TEXT_DIM};
-    padding: 8px 18px;
-    margin-right: 2px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
+    padding: 10px 22px;
+    margin-right: 3px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
     font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.5px;
 }}
-QTabBar::tab:hover {{ color: {TEXT}; }}
+QTabBar::tab:hover {{
+    color: {TEXT};
+    background: {BG_2};
+}}
 QTabBar::tab:selected {{
     background: {BG_1};
     color: {ACCENT};
     border: 1px solid {BORDER};
-    border-bottom: 1px solid {BG_1};
+    border-bottom: 2px solid {ACCENT};
+    font-weight: 600;
 }}
 
 QPlainTextEdit, QTextEdit {{
     background: {BG_1};
     border: 1px solid {BORDER};
     border-radius: 8px;
-    padding: 8px;
-    font-family: Menlo, Monaco, Consolas, monospace;
+    padding: 12px;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
+    selection-background-color: {ACCENT};
+    selection-color: {BG_0};
 }}
+
+QScrollArea {{ border: none; }}
 
 QScrollBar:vertical {{
     background: transparent; width: 10px; margin: 2px;
 }}
 QScrollBar::handle:vertical {{
-    background: {BG_3}; min-height: 30px; border-radius: 5px;
+    background: {BG_3}; min-height: 40px; border-radius: 5px;
 }}
 QScrollBar::handle:vertical:hover {{ background: {ACCENT}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
 QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
-QScrollBar::handle:horizontal {{ background: {BG_3}; min-width: 30px; border-radius: 5px; }}
+QScrollBar::handle:horizontal {{ background: {BG_3}; min-width: 40px; border-radius: 5px; }}
 QScrollBar::handle:horizontal:hover {{ background: {ACCENT}; }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: none; }}
 
 QToolTip {{
     background: {BG_2};
     color: {TEXT};
     border: 1px solid {ACCENT};
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
+    font-size: 11px;
 }}
 
 QPushButton {{
     background: {BG_2};
     border: 1px solid {BORDER};
     border-radius: 6px;
-    padding: 6px 14px;
+    padding: 7px 16px;
     color: {TEXT};
+    font-weight: 500;
 }}
-QPushButton:hover {{ background: {BG_3}; border-color: {ACCENT}; }}
+QPushButton:hover {{
+    background: {BG_3};
+    border-color: {ACCENT};
+    color: {ACCENT};
+}}
 QPushButton:pressed {{ background: {BG_1}; }}
 QPushButton#primary {{
-    background: {ACCENT};
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                stop:0 {ACCENT}, stop:1 #0ea5b8);
     color: {BG_0};
     border: 1px solid {ACCENT};
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.5px;
 }}
-QPushButton#primary:hover {{ background: #67e8f9; border-color: #67e8f9; }}
+QPushButton#primary:hover {{
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                stop:0 #67e8f9, stop:1 {ACCENT});
+    border-color: #67e8f9;
+    color: {BG_0};
+}}
+
+QFrame#statTile {{
+    background: {BG_2};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+}}
 """
 
 PLOT3D_HTML_TEMPLATE = """<!DOCTYPE html>
@@ -245,14 +300,26 @@ PLOT3D_HTML_TEMPLATE = """<!DOCTYPE html>
 <title>3D Track</title>
 <style>
   html,body{height:100%;margin:0;padding:0;background:#0b1220;
-            font-family:-apple-system,sans-serif;color:#e6edf7}
+            font-family:"Segoe UI","Helvetica Neue",sans-serif;color:#e6edf7;overflow:hidden}
   #plot{width:100%;height:100vh}
   .empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
          padding:18px 24px;background:#111a2e;border:1px solid #243154;
          color:#8b97b3;border-radius:8px;text-align:center}
+  .hud{position:absolute;top:14px;left:14px;z-index:10;
+       padding:8px 14px;background:rgba(17,26,46,0.85);
+       border:1px solid #22d3ee;border-radius:8px;
+       backdrop-filter:blur(6px);font-size:11px;letter-spacing:1px;
+       color:#22d3ee;font-weight:600}
+  .hud .v{color:#e6edf7;font-weight:400;letter-spacing:0;margin-left:8px}
 </style>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head><body>
+<div id="hud" class="hud" style="display:none">
+  <span>◈ TELEMETRY</span>
+  <span class="v" id="hud-alt">alt — m</span>
+  <span class="v" id="hud-d">dist — m</span>
+  <span class="v" id="hud-i">frame —/—</span>
+</div>
 <div id="plot"></div>
 <script>
 const PTS = __PTS__;
@@ -261,45 +328,184 @@ if (!PTS || PTS.x.length < 2) {
     + '<div style="font-size:14px;color:#e6edf7;margin-bottom:4px">No 3D track</div>'
     + '<div style="font-size:12px">Need at least 2 GPS/POS points with a 3D fix.</div></div>';
 } else {
-  const lineTrace = {
-    type: 'scatter3d', mode: 'lines',
-    x: PTS.x, y: PTS.y, z: PTS.z,
-    line: { width: 5, color: PTS.z, colorscale: [[0,'#22d3ee'],[1,'#a78bfa']],
-            colorbar: { title:{text:'Altitude (m)', font:{color:'#e6edf7'}}, tickfont:{color:'#8b97b3'} } },
-    hovertemplate: 'x: %{x:.1f} m<br>y: %{y:.1f} m<br>alt: %{z:.1f} m<extra></extra>',
-    name: 'flight path'
+  const X = PTS.x, Y = PTS.y, Z = PTS.z;
+  const N = X.length;
+  // Subsample for animation frames (cap ~150 to stay smooth)
+  const FRAMES = Math.min(150, N);
+  const STEP = Math.max(1, Math.floor(N / FRAMES));
+  const idxs = [];
+  for (let i = 0; i < N; i += STEP) idxs.push(i);
+  if (idxs[idxs.length-1] !== N - 1) idxs.push(N - 1);
+
+  // Cumulative distance for HUD
+  const cumD = new Array(N).fill(0);
+  for (let i = 1; i < N; i++) {
+    const dx=X[i]-X[i-1], dy=Y[i]-Y[i-1], dz=Z[i]-Z[i-1];
+    cumD[i] = cumD[i-1] + Math.sqrt(dx*dx+dy*dy+dz*dz);
+  }
+
+  // Direction vector at index i (forward difference, normalized)
+  function dir(i) {
+    const j = Math.min(i + 1, N - 1);
+    const k = Math.max(i - 1, 0);
+    let u = X[j]-X[k], v = Y[j]-Y[k], w = Z[j]-Z[k];
+    const m = Math.sqrt(u*u+v*v+w*w) || 1;
+    return [u/m, v/m, w/m];
+  }
+
+  const xExtent = Math.max(...X) - Math.min(...X);
+  const yExtent = Math.max(...Y) - Math.min(...Y);
+  const zExtent = Math.max(...Z) - Math.min(...Z);
+  const sizeRef = Math.max(0.6, Math.max(xExtent, yExtent, zExtent) * 0.06);
+
+  // ---- Initial traces ----
+  // 0: full route (dimmed)
+  const fullRoute = {
+    type:'scatter3d', mode:'lines',
+    x:X, y:Y, z:Z,
+    line:{ width:2, color:'rgba(167,139,250,0.30)' },
+    name:'route',
+    hoverinfo:'skip',
+    showlegend:true
   };
+  // 1: flown trail (bright cyan, grows during animation)
+  const flownTrail = {
+    type:'scatter3d', mode:'lines',
+    x:[X[0]], y:[Y[0]], z:[Z[0]],
+    line:{ width:6, color:'#22d3ee' },
+    name:'flown',
+    hoverinfo:'skip'
+  };
+  // 2: aircraft (cone, points along velocity)
+  const [u0,v0,w0] = dir(0);
+  const aircraft = {
+    type:'cone',
+    x:[X[0]], y:[Y[0]], z:[Z[0]],
+    u:[u0], v:[v0], w:[w0],
+    sizemode:'absolute', sizeref:sizeRef,
+    showscale:false,
+    colorscale:[[0,'#fbbf24'],[1,'#f87171']],
+    anchor:'tail',
+    name:'aircraft',
+    hovertemplate:'AIRCRAFT<br>x: %{x:.1f} m<br>y: %{y:.1f} m<br>alt: %{z:.1f} m<extra></extra>'
+  };
+  // 3: start marker
   const startMarker = {
-    type: 'scatter3d', mode: 'markers',
-    x: [PTS.x[0]], y: [PTS.y[0]], z: [PTS.z[0]],
-    marker: { size: 7, color: '#34d399', symbol:'circle' },
-    name: 'start',
-    hovertemplate: 'START<br>alt: %{z:.1f} m<extra></extra>'
+    type:'scatter3d', mode:'markers',
+    x:[X[0]], y:[Y[0]], z:[Z[0]],
+    marker:{ size:7, color:'#34d399', line:{color:'#0b1220',width:2} },
+    name:'start',
+    hovertemplate:'START<extra></extra>'
   };
+  // 4: end marker
   const endMarker = {
-    type: 'scatter3d', mode: 'markers',
-    x: [PTS.x[PTS.x.length-1]], y: [PTS.y[PTS.x.length-1]], z: [PTS.z[PTS.x.length-1]],
-    marker: { size: 7, color: '#f87171', symbol:'circle' },
-    name: 'end',
-    hovertemplate: 'END<br>alt: %{z:.1f} m<extra></extra>'
+    type:'scatter3d', mode:'markers',
+    x:[X[N-1]], y:[Y[N-1]], z:[Z[N-1]],
+    marker:{ size:7, color:'#f87171', line:{color:'#0b1220',width:2} },
+    name:'end',
+    hovertemplate:'END<extra></extra>'
   };
+
+  // ---- Animation frames ----
+  const frames = idxs.map(i => {
+    const [u,v,w] = dir(i);
+    return {
+      name: String(i),
+      data: [
+        {},  // route unchanged
+        { x:X.slice(0,i+1), y:Y.slice(0,i+1), z:Z.slice(0,i+1) },  // flown
+        { x:[X[i]], y:[Y[i]], z:[Z[i]], u:[u], v:[v], w:[w] }       // aircraft
+      ],
+      traces:[0,1,2]
+    };
+  });
+
+  const sliderSteps = idxs.map(i => ({
+    label:'',
+    method:'animate',
+    args:[[String(i)], { mode:'immediate',
+                         frame:{duration:0,redraw:true},
+                         transition:{duration:0} }]
+  }));
+
   const layout = {
-    paper_bgcolor: '#0b1220',
-    plot_bgcolor: '#0b1220',
-    font: { color:'#e6edf7' },
-    margin: { l:0, r:0, t:0, b:0 },
-    scene: {
-      bgcolor: '#0b1220',
-      xaxis: { title:'East (m)', gridcolor:'#243154', zerolinecolor:'#243154', color:'#8b97b3' },
-      yaxis: { title:'North (m)', gridcolor:'#243154', zerolinecolor:'#243154', color:'#8b97b3' },
-      zaxis: { title:'Altitude (m)', gridcolor:'#243154', zerolinecolor:'#243154', color:'#8b97b3' },
-      aspectmode: 'data',
-      camera: { eye:{x:1.4, y:1.4, z:0.9} }
+    paper_bgcolor:'#0b1220',
+    plot_bgcolor:'#0b1220',
+    font:{ color:'#e6edf7', family:'"Segoe UI","Helvetica Neue",sans-serif' },
+    margin:{ l:0, r:0, t:0, b:90 },
+    showlegend:true,
+    scene:{
+      bgcolor:'#0b1220',
+      xaxis:{ title:{text:'EAST (m)',font:{size:10,color:'#8b97b3'}},
+              gridcolor:'#243154', zerolinecolor:'#22d3ee', color:'#8b97b3',
+              showbackground:true, backgroundcolor:'rgba(17,26,46,0.4)' },
+      yaxis:{ title:{text:'NORTH (m)',font:{size:10,color:'#8b97b3'}},
+              gridcolor:'#243154', zerolinecolor:'#22d3ee', color:'#8b97b3',
+              showbackground:true, backgroundcolor:'rgba(17,26,46,0.4)' },
+      zaxis:{ title:{text:'ALTITUDE (m)',font:{size:10,color:'#8b97b3'}},
+              gridcolor:'#243154', zerolinecolor:'#a78bfa', color:'#8b97b3',
+              showbackground:true, backgroundcolor:'rgba(17,26,46,0.6)' },
+      aspectmode:'data',
+      camera:{ eye:{x:1.5, y:1.5, z:0.95} }
     },
-    legend: { font:{color:'#e6edf7'}, bgcolor:'rgba(17,26,46,0.7)', bordercolor:'#243154', borderwidth:1 }
+    legend:{ font:{color:'#e6edf7',size:10},
+             bgcolor:'rgba(17,26,46,0.85)',
+             bordercolor:'#22d3ee', borderwidth:1,
+             x:0.85, y:0.97 },
+    updatemenus:[{
+      type:'buttons',
+      direction:'left',
+      x:0.02, y:0, xanchor:'left', yanchor:'bottom',
+      pad:{t:10, b:20, l:0, r:0},
+      bgcolor:'rgba(17,26,46,0.0)', bordercolor:'rgba(0,0,0,0)',
+      font:{color:'#e6edf7', family:'"Segoe UI",sans-serif', size:11},
+      buttons:[
+        { label:'▶  PLAY', method:'animate',
+          args:[null, { mode:'immediate', fromcurrent:true,
+                        frame:{duration:60, redraw:true},
+                        transition:{duration:0} }] },
+        { label:'❚❚  PAUSE', method:'animate',
+          args:[[null], { mode:'immediate',
+                          frame:{duration:0, redraw:false},
+                          transition:{duration:0} }] },
+        { label:'⏮  RESET', method:'animate',
+          args:[[String(idxs[0])], { mode:'immediate',
+                                      frame:{duration:0, redraw:true},
+                                      transition:{duration:0} }] }
+      ]
+    }],
+    sliders:[{
+      pad:{t:10, b:0, l:280, r:30},
+      x:0, y:0,
+      len:1,
+      bgcolor:'#243154',
+      bordercolor:'rgba(0,0,0,0)',
+      activebgcolor:'#22d3ee',
+      tickcolor:'#8b97b3',
+      font:{color:'#8b97b3', size:10},
+      currentvalue:{ visible:false },
+      steps:sliderSteps
+    }]
   };
-  const config = { displayModeBar: true, displaylogo: false, responsive: true };
-  Plotly.newPlot('plot', [lineTrace, startMarker, endMarker], layout, config);
+  const config = { displayModeBar:true, displaylogo:false, responsive:true,
+                   modeBarButtonsToRemove:['toImage'] };
+
+  document.getElementById('hud').style.display = 'block';
+  function updateHud(i) {
+    document.getElementById('hud-alt').textContent = 'ALT ' + Z[i].toFixed(1) + ' m';
+    document.getElementById('hud-d').textContent   = 'DIST ' + cumD[i].toFixed(1) + ' m';
+    document.getElementById('hud-i').textContent   = 'FRAME ' + (idxs.indexOf(i)+1) + '/' + idxs.length;
+  }
+  updateHud(0);
+
+  Plotly.newPlot('plot', [fullRoute, flownTrail, aircraft, startMarker, endMarker], layout, config)
+    .then(gd => {
+      Plotly.addFrames('plot', frames);
+      gd.on('plotly_animatingframe', e => {
+        const i = parseInt(e.frame.name, 10);
+        if (!isNaN(i)) updateHud(i);
+      });
+    });
 }
 </script>
 </body></html>
@@ -930,51 +1136,81 @@ class MainWindow(QtWidgets.QMainWindow):
         header.setObjectName("header")
         header.setStyleSheet(
             f"QFrame#header {{ background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
-            f"stop:0 {BG_1}, stop:1 {BG_0}); border-bottom: 1px solid {BORDER}; }}"
+            f"stop:0 {BG_1}, stop:0.6 {BG_0}, stop:1 {BG_1});"
+            f"border-bottom: 1px solid {BORDER}; }}"
         )
-        header.setFixedHeight(64)
+        header.setFixedHeight(72)
         h = QtWidgets.QHBoxLayout(header)
-        h.setContentsMargins(18, 8, 18, 8)
+        h.setContentsMargins(22, 10, 22, 10)
+        h.setSpacing(14)
 
+        # Logo + status indicator
+        logo_block = QtWidgets.QHBoxLayout()
+        logo_block.setSpacing(10)
         logo = QtWidgets.QLabel("◆")
-        logo.setStyleSheet(f"color:{ACCENT}; font-size:22px; font-weight:600;")
-        h.addWidget(logo)
+        logo.setStyleSheet(
+            f"color:{ACCENT}; font-size:26px; font-weight:600;"
+            f"padding:0 4px;"
+        )
+        logo_block.addWidget(logo)
 
         title_box = QtWidgets.QVBoxLayout()
         title_box.setSpacing(0)
         title = QtWidgets.QLabel("UAV LOG VIEWER")
         title.setStyleSheet(
-            f"color:{TEXT}; font-size:15px; font-weight:700; letter-spacing:2px;"
+            f"color:{TEXT}; font-size:16px; font-weight:800; letter-spacing:3px;"
         )
-        subtitle = QtWidgets.QLabel("ArduPilot DataFlash telemetry analyzer")
-        subtitle.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px;")
+        subtitle = QtWidgets.QLabel("◢  ARDUPILOT TELEMETRY ANALYZER")
+        subtitle.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; letter-spacing:2px; font-weight:600;"
+        )
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
-        h.addLayout(title_box)
+        logo_block.addLayout(title_box)
+        h.addLayout(logo_block)
+
+        # Status indicator (pulses when loaded)
+        self.status_dot = QtWidgets.QLabel("●")
+        self.status_dot.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px;"
+        )
+        self.status_dot.setToolTip("No log loaded")
+        h.addWidget(self.status_dot)
+        self.status_dot_text = QtWidgets.QLabel("STANDBY")
+        self.status_dot_text.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; letter-spacing:2px; font-weight:600;"
+        )
+        h.addWidget(self.status_dot_text)
+
         h.addStretch(1)
 
+        # Telemetry summary chip
         self.header_summary = QtWidgets.QLabel("no log loaded")
         self.header_summary.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:12px; padding:6px 12px;"
-            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:6px;"
+            f"color:{TEXT_DIM}; font-size:11px; padding:8px 14px;"
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:8px;"
+            f"font-family:'SF Mono', Menlo, monospace;"
         )
         h.addWidget(self.header_summary)
 
         # Prominent credit badge in the header
         credit_badge = QtWidgets.QLabel(
-            f"<span style='color:{TEXT_DIM};font-size:11px;letter-spacing:1px;'>CREATED BY</span>"
-            f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:16px;font-weight:700;letter-spacing:1px;'>JAVID</span>"
+            f"<span style='color:{TEXT_DIM};font-size:10px;letter-spacing:2px;font-weight:600;'>CREATED BY</span>"
+            f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:16px;font-weight:800;letter-spacing:1.5px;'>JAVID</span>"
         )
         credit_badge.setTextFormat(Qt.TextFormat.RichText)
         credit_badge.setStyleSheet(
-            f"padding:8px 16px; background:{BG_2};"
+            f"padding:10px 18px;"
+            f"background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+            f"stop:0 {BG_2}, stop:1 {BG_1});"
             f"border:1px solid {ACCENT}; border-radius:8px;"
         )
         h.addWidget(credit_badge)
 
-        open_btn = QtWidgets.QPushButton("  Open .bin")
+        open_btn = QtWidgets.QPushButton("◉  OPEN LOG")
         open_btn.setObjectName("primary")
         open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_btn.setMinimumHeight(38)
         open_btn.clicked.connect(self.open_file)
         h.addWidget(open_btn)
         root_layout.addWidget(header)
@@ -1145,7 +1381,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.parsed = result
         name = Path(result["path"]).name
         start_txt = fmt_istanbul(result["t_start"], with_date=True) if result.get("t_start") else "—"
-        msg = f"✓  {name}   ·   {result['count']:,} msgs   ·   {result['duration']:0.1f}s   ·   start {start_txt} TR"
+        msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} TR"
         self.statusBar().showMessage(msg)
         self.header_summary.setText(
             f"<span style='color:{TEXT}'>{name}</span>"
@@ -1154,6 +1390,13 @@ class MainWindow(QtWidgets.QMainWindow):
             f"   ·   <span style='color:{TEXT_DIM}'>{start_txt} TR</span>"
         )
         self.header_summary.setTextFormat(Qt.TextFormat.RichText)
+        # Status dot → live cyan
+        self.status_dot.setStyleSheet(f"color:{SUCCESS}; font-size:11px;")
+        self.status_dot.setToolTip("Log active")
+        self.status_dot_text.setStyleSheet(
+            f"color:{SUCCESS}; font-size:10px; letter-spacing:2px; font-weight:700;"
+        )
+        self.status_dot_text.setText("LIVE")
         self._populate_tree()
         self._populate_info()
         self._populate_map()
@@ -1357,8 +1600,13 @@ class MainWindow(QtWidgets.QMainWindow):
             f"stop:0 {BG_2}, stop:1 {BG_1});"
             f" border:1px solid {BORDER};"
             f" border-left: 5px solid {overall_color};"
-            f" border-radius:10px; }}"
+            f" border-radius:12px; }}"
         )
+        score_shadow = QtWidgets.QGraphicsDropShadowEffect()
+        score_shadow.setBlurRadius(24)
+        score_shadow.setOffset(0, 4)
+        score_shadow.setColor(QtGui.QColor(0, 0, 0, 120))
+        score_card.setGraphicsEffect(score_shadow)
         sl = QtWidgets.QHBoxLayout(score_card)
         sl.setContentsMargins(20, 18, 20, 18)
         sl.setSpacing(20)
