@@ -1,3 +1,4 @@
+<img width="1680" height="1050" alt="Screenshot 2026-05-10 at 9 15 53 PM" src="https://github.com/user-attachments/assets/316cb81c-0230-4100-8cc9-739afb70ccc0" />
 # About Me
 Hey there, thank you for checking out my UAV Log Viewer!
 My name is Javid I'm 21, I'm an astronautics engineer and I'm highly interested in UAV engineering, I built my first UAV a year ago and then i decided to create this program. 
@@ -39,7 +40,10 @@ A native desktop log viewer and **automatic health analyzer** for ArduPilot Data
 
 ## Screenshots
 
-*(Add screenshots of the Plot, Map, 3D, and Auto Review tabs here.)*
+<img width="1680" height="1050" alt="Screenshot 2026-05-10 at 9 16 03 PM" src="https://github.com/user-attachments/assets/c4746345-43a0-47a3-a019-fddbb74279cc" />
+<img width="1680" height="1050" alt="Screenshot 2026-05-10 at 9 15 53 PM" src="https://github.com/user-attachments/assets/a28ee16d-c8f7-43a3-91d3-72382f2dfabd" />
+<img width="1680" height="1050" alt="Screenshot 2026-05-10 at 9 16 28 PM" src="https://github.com/user-attachments/assets/b287a7cf-ad73-4612-9e24-6239fe454982" />
+
 
 ---
 
