@@ -1,3 +1,7 @@
+# About Me
+Hey there, and thank you for checking out my UAV Log Viewer!
+My name is Javid I'm 21, I an astronautics engineer and I'm highly interested in UAV engineering, I built my first UAV a year ago and then i decided to create this program. 
+
 # UAV Log Viewer
 
 A native desktop log viewer and **automatic health analyzer** for ArduPilot DataFlash (`.bin`) flight logs. Inspired by [plot.ardupilot.org](https://plot.ardupilot.org/), but as a real desktop application with a built-in plain-language flight review.
@@ -57,15 +61,6 @@ The map and 3D views need an internet connection (they pull tile imagery from Op
 
 ---
 
-## Usage
-
-```bash
-# Open the app and pick a file via File → Open .bin
-python app.py
-
-# Or auto-load a file on launch
-python app.py path/to/your/log.bin
-```
 
 ### Tabs
 
@@ -86,11 +81,8 @@ The web-based ArduPilot log viewer is great for quick checks, but:
 - It shows you *the data*, not *what the data means*.
 - New pilots staring at vibration plots don't know if `25 m/s²` is good or bad.
 
-This tool fixes both: it's a real desktop app, and the **Auto Review** tab translates raw telemetry into sentences any pilot can act on:
+This tool fixes both: it's a real desktop app, and the **Auto Review** tab translates raw telemetry into sentences any pilot can act on
 
-> "Battery sagged badly: 8.83V minimum (~2.94V/cell). Below 3.3V/cell under load damages LiPo cells."
-
----
 
 ## Tech stack
 
