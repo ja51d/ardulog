@@ -1,0 +1,33 @@
+# Flight logs (don't commit personal flight data)
+*.bin
+*.tlog
+*.BIN
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+
+# Misc temporaries
+/tmp/
+*.tmp
