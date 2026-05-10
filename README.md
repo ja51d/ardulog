@@ -1,5 +1,5 @@
 # About Me
-Hey there, and thank you for checking out my UAV Log Viewer!
+Hey there, thank you for checking out my UAV Log Viewer!
 My name is Javid I'm 21, I an astronautics engineer and I'm highly interested in UAV engineering, I built my first UAV a year ago and then i decided to create this program. 
 
 # UAV Log Viewer
