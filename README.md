@@ -18,7 +18,6 @@ A native desktop log viewer and **automatic health analyzer** for ArduPilot Data
 - **One-click `.bin` parsing** — drop in any ArduPilot DataFlash log, parsed in a background thread via [pymavlink](https://github.com/ArduPilot/pymavlink). Tested on logs with 100k+ messages.
 - **Searchable message tree** — every message type and field exposed in a filterable sidebar. Click a checkbox to plot the field.
 - **Interactive multi-series plots** — fast `pyqtgraph` charts with a vertical crosshair that reads out the time-of-day under the cursor.
-- **Wall-clock time axis** — timestamps shown as real local time (Istanbul, UTC+3 by default). Easy to swap to your own timezone.
 - **2D satellite map** — flight track drawn on Esri World Imagery with a layer toggle for Dark / Satellite / Place labels. Zoom up to z22.
 - **3D trajectory view** — Plotly-powered orbit-able 3D path with altitude colorscale, hover tooltips (x/y/altitude in meters), and a built-in toolbar for screenshot export.
 - **Auto Flight Review** — analyzes the log and produces a plain-English health verdict across **14+ factors**:
