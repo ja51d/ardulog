@@ -71,8 +71,8 @@ The map and 3D views need an internet connection (they pull tile imagery from Op
 
 | Tab | What it shows |
 | --- | --- |
-| 📈 **Plot** | Time-series plots of any tickbox-selected fields. Crosshair shows wall-clock time. Click ✕ Clear all to reset. |
-| 🗺 **Map** | 2D satellite view of the GPS / EKF-smoothed flight path. Layer switcher in the top-right. |
+|  **Plot** | Time-series plots of any tickbox-selected fields. Crosshair shows wall-clock time. Click ✕ Clear all to reset. |
+|  **Map** | 2D satellite view of the GPS / EKF-smoothed flight path. Layer switcher in the top-right. |
 | ◧ **3D** | Orbit-able 3D trajectory in local meters (East / North / Altitude). |
 | ✓ **Auto Review** | Plain-language health summary with an overall verdict and per-factor cards. |
 | ⓘ **Info** | Raw log metadata: duration, vehicle type, mode timeline, error events, message counts. |
