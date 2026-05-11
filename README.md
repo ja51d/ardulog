@@ -7,7 +7,8 @@ My name is Javid I'm 21, I'm an astronautics engineer and I'm highly interested 
 # UAV Log Viewer
 
 A native desktop log viewer and **automatic health analyzer** for ArduPilot DataFlash (`.bin`) flight logs. Inspired by [plot.ardupilot.org](https://plot.ardupilot.org/), but offline and as a real desktop application with a built-in plain-language flight review.
-<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 1 28 53 PM" src="https://github.com/user-attachments/assets/85a24b4c-9a15-45f2-b5e5-5145b356e639" />
+<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 51 35 PM" src="https://github.com/user-attachments/assets/22410de2-367c-409d-ac32-daa3e1cc11ea" />
+
 
 
 > **Created by Javid**
@@ -53,9 +54,11 @@ A native desktop log viewer and **automatic health analyzer** for ArduPilot Data
 
 ## Screenshots
 
-<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 12 56 42 PM" src="https://github.com/user-attachments/assets/052ea027-5656-42b6-a913-b79d3880b2a9" />
-<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 12 54 58 PM" src="https://github.com/user-attachments/assets/24ae1638-e31e-4714-b489-e3c1e648b451" />
-<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 1 29 10 PM" src="https://github.com/user-attachments/assets/8e0e1ae2-c1ed-4e32-8a22-d9d365c5cac8" />
+<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 48 55 PM" src="https://github.com/user-attachments/assets/141f71e9-37e3-4bc2-b881-35f4f0695e3c" />
+
+<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 49 15 PM" src="https://github.com/user-attachments/assets/cb66780c-4381-450d-9019-85733814b05b" />
+<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 49 07 PM" src="https://github.com/user-attachments/assets/fc81a5f9-a3b4-4bd0-b38f-f28e2e240e76" />
+
 
 ---
 
