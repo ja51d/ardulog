@@ -729,6 +729,21 @@ if (!D) {
     });
   });
 
+  // External bridge: master timeline can drive this view via window.setPos(t_sec)
+  window.setPos = function(t_sec) {
+    if (!D || !D.trel || D.n < 2) return;
+    playing = false;
+    if (t_sec <= D.trel[0]) { update(0); return; }
+    if (t_sec >= D.trel[D.n-1]) { update(D.n-1); return; }
+    let lo = 0;
+    for (let i = 1; i < D.n; i++) {
+      if (D.trel[i] >= t_sec) { lo = i - 1; break; }
+    }
+    const span = D.trel[lo+1] - D.trel[lo];
+    const f = span > 0 ? (t_sec - D.trel[lo]) / span : 0;
+    update(lo + f);
+  };
+
   update(0);
 }
 </script>
@@ -1103,6 +1118,21 @@ if (!PTS || PTS.x.length < 2) {
           btn.classList.add('active');
         });
       });
+
+      // External bridge: master timeline can drive this view via window.setPos(t_sec)
+      window.setPos = function(t_sec) {
+        if (!TREL || TREL.length < 2) return;
+        playing = false;
+        if (t_sec <= TREL[0]) { renderFrame(0); return; }
+        if (t_sec >= TREL[N-1]) { renderFrame(N-1); return; }
+        let lo = 0;
+        for (let i = 1; i < N; i++) {
+          if (TREL[i] >= t_sec) { lo = i - 1; break; }
+        }
+        const span = TREL[lo+1] - TREL[lo];
+        const f = span > 0 ? (t_sec - TREL[lo]) / span : 0;
+        renderFrame(lo + f);
+      };
     });
 }
 </script>
@@ -1143,6 +1173,7 @@ MAP_HTML_TEMPLATE = """<!DOCTYPE html>
 const TRACK = __TRACK__;
 const COORDS = TRACK.coords || [];
 const ALTS   = TRACK.alts   || [];
+const TREL   = TRACK.trel   || [];
 const map = L.map('map', {
   zoomControl: true,
   attributionControl: true,
@@ -1247,6 +1278,28 @@ if (COORDS.length > 1) {
   L.circleMarker(COORDS[COORDS.length-1], {
     radius:8, color:'#0b1220', fillColor:'#f87171', fillOpacity:1, weight:2
   }).addTo(map).bindTooltip('end', {direction:'top', permanent:false});
+
+  // Moving marker driven by the master timeline (window.setPos)
+  const flightMarker = L.circleMarker(COORDS[0], {
+    radius:10, color:'#0b1220', fillColor:'#22d3ee', fillOpacity:1,
+    weight:3, className:'flight-marker'
+  });
+  window.setPos = function(t_sec) {
+    if (!TREL || TREL.length !== COORDS.length || TREL.length < 2) return;
+    if (t_sec <= TREL[0]) { flightMarker.setLatLng(COORDS[0]).addTo(map); return; }
+    if (t_sec >= TREL[TREL.length-1]) {
+      flightMarker.setLatLng(COORDS[COORDS.length-1]).addTo(map); return;
+    }
+    let lo = 0;
+    for (let i = 1; i < TREL.length; i++) {
+      if (TREL[i] >= t_sec) { lo = i - 1; break; }
+    }
+    const span = TREL[lo+1] - TREL[lo];
+    const f = span > 0 ? (t_sec - TREL[lo]) / span : 0;
+    const lat = COORDS[lo][0] + (COORDS[lo+1][0] - COORDS[lo][0]) * f;
+    const lng = COORDS[lo][1] + (COORDS[lo+1][1] - COORDS[lo][1]) * f;
+    flightMarker.setLatLng([lat, lng]).addTo(map);
+  };
 
   const bounds = allTrack.getBounds().pad(0.3);
   map.fitBounds(bounds, {padding:[30,30], maxZoom: 19});
@@ -1917,6 +1970,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.color_idx = 0
         self.worker: LogParseWorker | None = None
         self.recent_files: list[str] = self._load_recent_files()
+        self.comparison: dict | None = None
+        self.comparison_curves: dict[tuple[str, str], pg.PlotDataItem] = {}
+        self._cmp_worker: LogParseWorker | None = None
 
         self._build_menu()
         self._build_ui()
@@ -1952,6 +2008,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.recent_menu = file_menu.addMenu("Open &Recent")
         self._rebuild_recent_menu()
+
+        file_menu.addSeparator()
+        compare_act = QtGui.QAction("Load &comparison log…", self)
+        compare_act.setShortcut("Ctrl+Shift+O")
+        compare_act.triggered.connect(self.open_comparison_file)
+        file_menu.addAction(compare_act)
+        clear_cmp_act = QtGui.QAction("Clear comparison overlay", self)
+        clear_cmp_act.triggered.connect(self.clear_comparison)
+        file_menu.addAction(clear_cmp_act)
 
         file_menu.addSeparator()
         report_act = QtGui.QAction("Export flight &report (PDF)…", self)
@@ -2029,6 +2094,158 @@ class MainWindow(QtWidgets.QMainWindow):
         self.recent_files = []
         self._save_recent_files()
         self._rebuild_recent_menu()
+
+    # ----- Compare two logs (overlay) -----
+    def open_comparison_file(self):
+        if self.parsed is None:
+            QtWidgets.QMessageBox.information(
+                self, "No base log",
+                "Load a primary log first, then add a comparison.")
+            return
+        start_dir = str(Path(__file__).parent)
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open comparison log", start_dir,
+            "Flight logs (*.bin *.BIN *.tlog *.TLOG *.log);;All files (*)"
+        )
+        if not path:
+            return
+        if hasattr(self, "_cmp_worker") and self._cmp_worker and self._cmp_worker.isRunning():
+            return
+        self.statusBar().showMessage(f"Parsing comparison {Path(path).name}…")
+        self._cmp_worker = LogParseWorker(path)
+        self._cmp_worker.done.connect(self._on_comparison_parsed)
+        self._cmp_worker.error.connect(lambda m: QtWidgets.QMessageBox.critical(
+            self, "Comparison failed", m))
+        self._cmp_worker.start()
+
+    def _on_comparison_parsed(self, result: dict):
+        self.comparison = result
+        # Re-add overlays for every existing curve so user immediately sees the comparison
+        existing = list(self.curves.keys())
+        for key in existing:
+            self._add_comparison_curve(*key)
+        self.statusBar().showMessage(
+            f"Comparison loaded: {Path(result['path']).name}  "
+            f"({result['count']:,} msgs)  ·  dashed overlay = comparison"
+        )
+
+    def _add_comparison_curve(self, mtype: str, field: str):
+        cmp_curves = getattr(self, "comparison_curves", {})
+        if not cmp_curves and not hasattr(self, "comparison_curves"):
+            self.comparison_curves = {}
+            cmp_curves = self.comparison_curves
+        key = (mtype, field)
+        if key in self.comparison_curves:
+            return
+        cmp = getattr(self, "comparison", None)
+        if cmp is None:
+            return
+        if mtype not in cmp["data"] or field not in cmp["data"][mtype]:
+            return
+        # Time-align: subtract comparison's t_start so both flights play from t=0
+        t_start_cmp = cmp.get("t_start") or 0.0
+        x = cmp["times"][mtype] - t_start_cmp
+        y = cmp["data"][mtype][field]
+        if len(x) == 0:
+            return
+        # Match the colour of the base curve and pair with a dashed pen so the
+        # eye can tell at-a-glance which-is-which.
+        base_curve = self.curves.get(key)
+        col = "#fbbf24"  # default amber
+        if base_curve is not None:
+            try:
+                col = base_curve.opts.get("pen").color().name()
+            except Exception:
+                pass
+        pen = pg.mkPen(color=col, width=1.6, style=Qt.PenStyle.DashLine)
+        curve = self.plot.plot(x, y, pen=pen, name=f"{mtype}.{field} (cmp)")
+        self.comparison_curves[key] = curve
+
+    def _remove_comparison_curve(self, key):
+        cmp_curves = getattr(self, "comparison_curves", {})
+        c = cmp_curves.pop(key, None)
+        if c is not None:
+            self.plot.removeItem(c)
+            self.plot.plotItem.legend.removeItem(c)
+
+    def clear_comparison(self):
+        cmp_curves = getattr(self, "comparison_curves", {})
+        for k in list(cmp_curves.keys()):
+            self._remove_comparison_curve(k)
+        self.comparison = None
+        self.statusBar().showMessage("Comparison overlay cleared.")
+
+    # ----- Master synchronized playback -----
+    def _toggle_master_play(self):
+        if self.parsed is None:
+            return
+        if self.master_playing:
+            self.master_playing = False
+            self.master_timer.stop()
+            self.master_play_btn.setText("▶ PLAY ALL")
+        else:
+            duration = float(self.parsed.get("duration", 0))
+            if self.master_t >= duration - 0.05:
+                self.master_t = 0.0
+            self.master_playing = True
+            self.master_play_btn.setText("❚❚ PAUSE")
+            self.master_last_ts = time.monotonic()
+            self.master_timer.start()
+
+    def _master_reset(self):
+        self.master_playing = False
+        self.master_timer.stop()
+        self.master_play_btn.setText("▶ PLAY ALL")
+        self.master_t = 0.0
+        self._master_push()
+
+    def _master_tick(self):
+        if not self.master_playing or self.parsed is None:
+            return
+        now = time.monotonic()
+        dt = now - self.master_last_ts
+        self.master_last_ts = now
+        duration = float(self.parsed.get("duration", 0))
+        self.master_t += dt
+        if self.master_t >= duration:
+            self.master_t = duration
+            self._toggle_master_play()
+        self._master_push()
+
+    def _on_master_slider_changed(self, value: int):
+        if self.parsed is None:
+            return
+        duration = float(self.parsed.get("duration", 0))
+        new_t = (value / 1000.0) * duration
+        # Only act if change came from user interaction (not our own update)
+        if abs(new_t - self.master_t) < 1e-6:
+            return
+        # If user scrubs while playing, pause
+        if self.master_playing:
+            self._toggle_master_play()
+        self.master_t = new_t
+        self._master_push(emit_slider=False)
+
+    def _master_push(self, emit_slider: bool = True):
+        if self.parsed is None:
+            return
+        duration = max(0.001, float(self.parsed.get("duration", 0)))
+        # Time label
+        self.master_time_label.setText(
+            f"T+{self.master_t:6.1f}s  ·  {self.master_t/duration*100:5.1f}%"
+        )
+        # Slider sync (block signal to avoid feedback)
+        if emit_slider:
+            self.master_slider.blockSignals(True)
+            self.master_slider.setValue(int((self.master_t / duration) * 1000))
+            self.master_slider.blockSignals(False)
+        # Push to web views
+        code = f"if (typeof window.setPos === 'function') window.setPos({self.master_t});"
+        for v in (self.instruments_view, self.view3d, self.map_view):
+            try:
+                v.page().runJavaScript(code)
+            except Exception:
+                pass
 
     # ----- PDF flight report -----
     def export_pdf_report(self):
@@ -2281,6 +2498,68 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         root_layout.addWidget(accent_line)
 
+        # Master playback bar — drives Cockpit + 3D + Map at the same wall-clock
+        self.master_bar = QtWidgets.QFrame()
+        self.master_bar.setStyleSheet(
+            f"background:{BG_1};border-bottom:1px solid {BORDER};"
+        )
+        self.master_bar.setFixedHeight(48)
+        mb = QtWidgets.QHBoxLayout(self.master_bar)
+        mb.setContentsMargins(16, 6, 16, 6)
+        mb.setSpacing(12)
+
+        mlabel = QtWidgets.QLabel("◈ MASTER TIMELINE")
+        mlabel.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; font-weight:700;"
+            f"letter-spacing:2px;"
+        )
+        mb.addWidget(mlabel)
+
+        self.master_play_btn = QtWidgets.QPushButton("▶ PLAY ALL")
+        self.master_play_btn.setObjectName("primary")
+        self.master_play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.master_play_btn.setMinimumWidth(110)
+        self.master_play_btn.clicked.connect(self._toggle_master_play)
+        mb.addWidget(self.master_play_btn)
+
+        self.master_reset_btn = QtWidgets.QPushButton("⏮")
+        self.master_reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.master_reset_btn.clicked.connect(self._master_reset)
+        mb.addWidget(self.master_reset_btn)
+
+        self.master_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
+        self.master_slider.setMinimum(0)
+        self.master_slider.setMaximum(1000)
+        self.master_slider.setStyleSheet(
+            f"QSlider::groove:horizontal {{ height:6px; background:{BG_3}; border-radius:3px; }}"
+            f"QSlider::handle:horizontal {{ width:16px; margin:-6px 0; background:{ACCENT};"
+            f"border:2px solid {BG_0}; border-radius:9px; }}"
+            f"QSlider::sub-page:horizontal {{ background:{ACCENT}; border-radius:3px; }}"
+        )
+        self.master_slider.valueChanged.connect(self._on_master_slider_changed)
+        mb.addWidget(self.master_slider, 1)
+
+        self.master_time_label = QtWidgets.QLabel("T+0.0s")
+        self.master_time_label.setStyleSheet(
+            f"color:{ACCENT};font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
+            f"font-weight:700;min-width:140px;font-size:12px;"
+        )
+        self.master_time_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        mb.addWidget(self.master_time_label)
+
+        root_layout.addWidget(self.master_bar)
+
+        # Master playback state
+        self.master_t = 0.0           # seconds since flight start
+        self.master_playing = False
+        self.master_last_ts = 0.0
+        self.master_timer = QtCore.QTimer(self)
+        self.master_timer.setInterval(33)  # ~30 fps
+        self.master_timer.timeout.connect(self._master_tick)
+        self.master_bar.setEnabled(False)
+        self.master_bar.setVisible(False)
+
         # --- Body splitter ---
         splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(1)
@@ -2529,6 +2808,15 @@ class MainWindow(QtWidgets.QMainWindow):
             ax = pid_plot.getAxis("bottom")
             if hasattr(ax, "set_t_start"):
                 ax.set_t_start(t0)
+        # Reset & enable master timeline
+        self.master_playing = False
+        self.master_timer.stop()
+        self.master_t = 0.0
+        self.master_bar.setEnabled(True)
+        self.master_bar.setVisible(True)
+        self.master_play_btn.setText("▶ PLAY ALL")
+        # Push initial position once web views finish loading
+        QtCore.QTimer.singleShot(800, lambda: self._master_push(emit_slider=True))
         name = Path(result["path"]).name
         start_txt = fmt_istanbul(result["t_start"], with_date=True) if result.get("t_start") else "—"
         msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} TR"
@@ -2631,12 +2919,17 @@ class MainWindow(QtWidgets.QMainWindow):
         curve = self.plot.plot(x, y, pen=pen, name=f"{mtype}.{field}")
         self.curves[key] = curve
         self._update_plot_count()
+        # If a comparison log is loaded, mirror this field as a dashed overlay
+        if getattr(self, "comparison", None) is not None:
+            self._add_comparison_curve(mtype, field)
 
     def _remove_curve(self, key: tuple[str, str]):
         curve = self.curves.pop(key, None)
         if curve is not None:
             self.plot.removeItem(curve)
             self.plot.plotItem.legend.removeItem(curve)
+        # Also remove the matching comparison overlay if present
+        self._remove_comparison_curve(key)
         self._update_plot_count()
 
     def clear_plot(self):
@@ -3128,9 +3421,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._set_map_coords(track)
 
     def _extract_track(self) -> dict:
-        """Return a clean lat/lng/alt track. Prefer POS (EKF-smoothed) over raw GPS."""
+        """Return a clean lat/lng/alt + relative-seconds track."""
         if self.parsed is None:
-            return {"coords": [], "alts": []}
+            return {"coords": [], "alts": [], "trel": []}
+        t_start = self.parsed.get("t_start") or 0.0
         for mt in ("POS", "GPS", "GPS2"):
             block = self.parsed["data"].get(mt)
             if not block:
@@ -3143,6 +3437,9 @@ class MainWindow(QtWidgets.QMainWindow):
             lats = np.asarray(block[lat_key], dtype=float)
             lngs = np.asarray(block[lng_key], dtype=float)
             alts = np.asarray(block.get("Alt", np.zeros_like(lats)), dtype=float)
+            ts = np.asarray(self.parsed["times"].get(mt, []), dtype=float)
+            if len(ts) != len(lats):
+                ts = np.zeros_like(lats)
             if len(lats) == 0:
                 continue
 
@@ -3159,25 +3456,27 @@ class MainWindow(QtWidgets.QMainWindow):
                 if nsats is not None:
                     mask &= np.asarray(nsats, dtype=float) >= 4
 
-            lats = lats[mask]; lngs = lngs[mask]; alts = alts[mask]
+            lats = lats[mask]; lngs = lngs[mask]; alts = alts[mask]; ts = ts[mask]
             if len(lats) < 2:
                 continue
 
             med_la, med_lo = float(np.median(lats)), float(np.median(lngs))
             jump_mask = (np.abs(lats - med_la) < 0.01) & (np.abs(lngs - med_lo) < 0.01)
-            lats = lats[jump_mask]; lngs = lngs[jump_mask]; alts = alts[jump_mask]
+            lats = lats[jump_mask]; lngs = lngs[jump_mask]
+            alts = alts[jump_mask]; ts = ts[jump_mask]
             if len(lats) < 2:
                 continue
 
-            # Downsample (max 3000 segments — colored polylines are heavier than a single line)
             if len(lats) > 3000:
                 step = len(lats) // 3000
-                lats = lats[::step]; lngs = lngs[::step]; alts = alts[::step]
+                lats = lats[::step]; lngs = lngs[::step]
+                alts = alts[::step]; ts = ts[::step]
             return {
                 "coords": [[float(la), float(lo)] for la, lo in zip(lats, lngs)],
-                "alts": [float(a) for a in alts],
+                "alts":   [float(a) for a in alts],
+                "trel":   [float(t - t_start) if t > 0 else 0.0 for t in ts],
             }
-        return {"coords": [], "alts": []}
+        return {"coords": [], "alts": [], "trel": []}
 
     def _set_map_coords(self, track):
         # Back-compat: list of [lat,lng] still works
