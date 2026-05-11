@@ -1980,22 +1980,41 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
 
     # ----- Drag and drop -----
+    @staticmethod
+    def _is_log_path(p: str) -> bool:
+        return bool(p) and p.lower().endswith((".bin", ".tlog", ".log"))
+
     def dragEnterEvent(self, e: QtGui.QDragEnterEvent):
+        # Be permissive — accept any URL-bearing drag, validate at drop time
         if e.mimeData().hasUrls():
-            for url in e.mimeData().urls():
-                p = url.toLocalFile().lower()
-                if p.endswith((".bin", ".tlog", ".log")):
-                    e.acceptProposedAction()
-                    return
-        e.ignore()
+            e.acceptProposedAction()
+        else:
+            e.ignore()
+
+    def dragMoveEvent(self, e: QtGui.QDragMoveEvent):
+        # Required so the cursor keeps showing "accept" while hovering
+        if e.mimeData().hasUrls():
+            e.acceptProposedAction()
+        else:
+            e.ignore()
 
     def dropEvent(self, e: QtGui.QDropEvent):
         for url in e.mimeData().urls():
             p = url.toLocalFile()
-            if p.lower().endswith((".bin", ".tlog", ".log")):
+            if self._is_log_path(p):
                 self.load_file(p)
                 e.acceptProposedAction()
                 return
+        e.ignore()
+
+    # macOS Finder "Open With…" / drag-onto-Dock-icon → QFileOpenEvent
+    def event(self, ev):
+        if ev.type() == QtCore.QEvent.Type.FileOpen:
+            p = ev.file()
+            if self._is_log_path(p):
+                self.load_file(p)
+                return True
+        return super().event(ev)
 
     # ----- UI -----
     def _build_menu(self):
@@ -2729,7 +2748,7 @@ class MainWindow(QtWidgets.QMainWindow):
             p.addLegend(brush=pg.mkBrush(BG_2), pen=pg.mkPen(BORDER), labelTextColor=TEXT)
             self.pid_plots.append(p)
             pid_layout.addWidget(p, 1)
-        self.tabs.addTab(pid_container, "  PID  ")
+        self.tabs.addTab(pid_container, "  PID TUNING  ")
 
         # Instruments tab (cockpit: attitude, heading, altitude, sticks)
         self.instruments_view = QWebEngineView()
@@ -3515,6 +3534,35 @@ def main():
 
     win = MainWindow()
     win.show()
+
+    # App-wide drag-and-drop filter — catches drops landing on any child
+    # widget (esp. QWebEngineView, which would otherwise swallow them).
+    class _DropFilter(QtCore.QObject):
+        def __init__(self, target: "MainWindow"):
+            super().__init__(target)
+            self.target = target
+        def eventFilter(self, obj, ev):
+            t = ev.type()
+            if t == QtCore.QEvent.Type.DragEnter or t == QtCore.QEvent.Type.DragMove:
+                if ev.mimeData().hasUrls():
+                    ev.acceptProposedAction()
+                    return True
+            elif t == QtCore.QEvent.Type.Drop:
+                for url in ev.mimeData().urls():
+                    p = url.toLocalFile()
+                    if self.target._is_log_path(p):
+                        self.target.load_file(p)
+                        ev.acceptProposedAction()
+                        return True
+            elif t == QtCore.QEvent.Type.FileOpen:
+                p = ev.file()
+                if self.target._is_log_path(p):
+                    self.target.load_file(p)
+                    return True
+            return False
+    win._drop_filter = _DropFilter(win)
+    app.installEventFilter(win._drop_filter)
+
     if len(sys.argv) > 1 and Path(sys.argv[1]).exists():
         QtCore.QTimer.singleShot(50, lambda: win.load_file(sys.argv[1]))
     sys.exit(app.exec())
