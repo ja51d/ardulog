@@ -290,6 +290,21 @@ QPushButton#primary:hover {{
     border-color: #67e8f9;
     color: {BG_0};
 }}
+QPushButton#violet {{
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                stop:0 {ACCENT_2}, stop:1 #8b5cf6);
+    color: {BG_0};
+    border: 1px solid {ACCENT_2};
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 7px 18px;
+}}
+QPushButton#violet:hover {{
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
+                stop:0 #c4b5fd, stop:1 {ACCENT_2});
+    border-color: #c4b5fd;
+    color: {BG_0};
+}}
 
 QFrame#statTile {{
     background: {BG_2};
@@ -2499,6 +2514,16 @@ class MainWindow(QtWidgets.QMainWindow):
             f"border:1px solid {ACCENT}; border-radius:8px;"
         )
         h.addWidget(credit_badge)
+
+        # Export PDF report button — same row, distinct violet accent
+        self.export_btn = QtWidgets.QPushButton("⎙  EXPORT PDF")
+        self.export_btn.setObjectName("violet")
+        self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_btn.setMinimumHeight(38)
+        self.export_btn.setToolTip(
+            "Save a one-page flight report (Auto Review + mode timeline + incidents) as PDF.")
+        self.export_btn.clicked.connect(self.export_pdf_report)
+        h.addWidget(self.export_btn)
 
         open_btn = QtWidgets.QPushButton("◉  OPEN LOG")
         open_btn.setObjectName("primary")
