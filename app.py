@@ -46,7 +46,7 @@ _fix_qt_plugin_path()
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtPrintSupport, QtWidgets
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from pymavlink import DFReader
@@ -66,7 +66,10 @@ SUCCESS = "#34d399"
 
 pg.setConfigOption("background", BG_1)
 pg.setConfigOption("foreground", TEXT)
-pg.setConfigOptions(antialias=True)
+# Antialias OFF — on macOS, anti-aliased software paths take ~1s for 3,500
+# points which makes plotting feel like the UI is frozen. Lines still look
+# fine with Qt's default rendering at typical screen sizes.
+pg.setConfigOptions(antialias=False)
 
 PLOT_COLORS = [
     "#22d3ee",  # cyan
@@ -1137,7 +1140,9 @@ MAP_HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const COORDS = __COORDS__;
+const TRACK = __TRACK__;
+const COORDS = TRACK.coords || [];
+const ALTS   = TRACK.alts   || [];
 const map = L.map('map', {
   zoomControl: true,
   attributionControl: true,
@@ -1176,10 +1181,66 @@ const overlays = {
 };
 L.control.layers(baseLayers, overlays, {position:'topright', collapsed:false}).addTo(map);
 
+// Altitude → color (cyan low → violet mid → amber high)
+function altColor(t) {
+  // t in [0,1]
+  const lerp = (a, b, k) => Math.round(a + (b - a) * k);
+  let r, g, b;
+  if (t < 0.5) { const k = t * 2;
+    r = lerp(0x22, 0xa7, k); g = lerp(0xd3, 0x8b, k); b = lerp(0xee, 0xfa, k);
+  } else { const k = (t - 0.5) * 2;
+    r = lerp(0xa7, 0xfb, k); g = lerp(0x8b, 0xbf, k); b = lerp(0xfa, 0x24, k);
+  }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
 // --- Track ---
 if (COORDS.length > 1) {
-  const glow = L.polyline(COORDS, {color:'#22d3ee', weight:9, opacity:0.25}).addTo(map);
-  const line = L.polyline(COORDS, {color:'#22d3ee', weight:3, opacity:1.0}).addTo(map);
+  // Single glow line under the colored segments for visual depth
+  L.polyline(COORDS, {color:'#22d3ee', weight:10, opacity:0.18}).addTo(map);
+
+  const allTrack = L.featureGroup().addTo(map);
+
+  if (ALTS.length === COORDS.length && ALTS.length > 1) {
+    let aMin = Infinity, aMax = -Infinity;
+    for (const a of ALTS) { if (a < aMin) aMin = a; if (a > aMax) aMax = a; }
+    const span = (aMax - aMin) || 1;
+    // Draw each segment colored by its midpoint altitude
+    for (let i = 0; i < COORDS.length - 1; i++) {
+      const midAlt = (ALTS[i] + ALTS[i+1]) / 2;
+      const t = (midAlt - aMin) / span;
+      const seg = L.polyline([COORDS[i], COORDS[i+1]], {
+        color: altColor(t), weight: 3.5, opacity: 1.0
+      });
+      seg.bindTooltip('alt: ' + midAlt.toFixed(1) + ' m', {sticky:true});
+      seg.addTo(allTrack);
+    }
+    // Altitude legend in the bottom-right
+    const legend = L.control({position:'bottomright'});
+    legend.onAdd = function() {
+      const div = L.DomUtil.create('div');
+      div.style.cssText = 'background:rgba(17,26,46,0.92);border:1px solid #243154;'
+        + 'border-radius:6px;padding:8px 10px;font-family:Inter,sans-serif;'
+        + 'color:#e6edf7;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,0.5)';
+      div.innerHTML = '<div style="font-size:10px;letter-spacing:1.5px;color:#8b97b3;'
+        + 'font-weight:700;margin-bottom:4px">ALTITUDE</div>'
+        + '<div style="height:80px;width:14px;float:left;margin-right:8px;'
+        + 'background:linear-gradient(to top, #22d3ee 0%, #a78bfa 50%, #fbbf24 100%);'
+        + 'border-radius:3px;border:1px solid #243154"></div>'
+        + '<div style="font-family:JetBrains Mono,monospace;line-height:80px;font-size:10px;'
+        + 'display:flex;flex-direction:column;justify-content:space-between;height:80px">'
+        + '<span>' + aMax.toFixed(0) + ' m</span>'
+        + '<span style="color:#8b97b3">' + ((aMin+aMax)/2).toFixed(0) + ' m</span>'
+        + '<span>' + aMin.toFixed(0) + ' m</span></div>'
+        + '<div style="clear:both"></div>';
+      return div;
+    };
+    legend.addTo(map);
+  } else {
+    // Fallback (no altitude data): single cyan line
+    L.polyline(COORDS, {color:'#22d3ee', weight:3, opacity:1.0}).addTo(allTrack);
+  }
+
   L.circleMarker(COORDS[0], {
     radius:8, color:'#0b1220', fillColor:'#34d399', fillOpacity:1, weight:2
   }).addTo(map).bindTooltip('start', {direction:'top', permanent:false});
@@ -1187,9 +1248,7 @@ if (COORDS.length > 1) {
     radius:8, color:'#0b1220', fillColor:'#f87171', fillOpacity:1, weight:2
   }).addTo(map).bindTooltip('end', {direction:'top', permanent:false});
 
-  // Pad the bounds slightly and pick a tighter starting zoom so the user
-  // sees the location, then they can zoom further in (max 22).
-  const bounds = line.getBounds().pad(0.3);
+  const bounds = allTrack.getBounds().pad(0.3);
   map.fitBounds(bounds, {padding:[30,30], maxZoom: 19});
 } else {
   map.setView([20,0], 2);
@@ -1555,11 +1614,147 @@ def auto_review(parsed: dict) -> list[dict]:
             f"{len(unique)} mode change(s): " + " → ".join(str(m) for m in unique),
             "")
 
+    # ---------- Crash / incident detection ----------
+    incidents = detect_incidents(parsed)
+    if incidents:
+        worst = max(incidents, key=lambda x: x["severity"])
+        sev_label = {1: "Marginal", 2: "Marginal", 3: "Bad"}[worst["severity"]]
+        sev_color = {1: "#fbbf24", 2: "#fbbf24", 3: DANGER}[worst["severity"]]
+        bullets = []
+        for ev in incidents[:8]:
+            bullets.append(f"{fmt_istanbul(ev['t'])}  {ev['title']} — {ev['detail']}")
+        more = f"  (+{len(incidents)-8} more)" if len(incidents) > 8 else ""
+        add("Incidents detected", sev_label, sev_color,
+            f"{len(incidents)} notable event(s) detected.",
+            "\n".join(bullets) + more)
+
     if not items:
         add("No data", "Info", TEXT_DIM,
             "Couldn't run the auto-review.",
             "Standard message types (VIBE, GPS, BAT, MAG, ERR) were not found in this log.")
     return items
+
+
+def detect_incidents(parsed: dict) -> list[dict]:
+    """Scan a parsed log for crash-like or anomaly events. Each event:
+    {t: unix_seconds, title: short label, detail: explanation, severity: 1-3}."""
+    data = parsed["data"]
+    times = parsed["times"]
+    events: list[dict] = []
+
+    # 1. ERR messages — explicit subsystem errors logged by autopilot
+    if "ERR" in data and "ERR" in times:
+        et = np.asarray(times["ERR"], dtype=float)
+        subs = data["ERR"].get("Subsys", [])
+        codes = data["ERR"].get("ECode", [])
+        for i in range(len(et)):
+            sub = subs[i] if i < len(subs) else "?"
+            code = codes[i] if i < len(codes) else "?"
+            if int(code) == 0:
+                continue  # 0 = subsystem recovered/cleared
+            events.append({
+                "t": float(et[i]),
+                "title": f"ERR Subsys={sub}",
+                "detail": f"Autopilot logged error code {code} on subsystem {sub}",
+                "severity": 3,
+            })
+
+    # 2. Sudden attitude excursion (>60° roll or pitch)
+    if "ATT" in data and "Roll" in data["ATT"] and "Pitch" in data["ATT"]:
+        roll = np.asarray(data["ATT"]["Roll"], dtype=float)
+        pitch = np.asarray(data["ATT"]["Pitch"], dtype=float)
+        att_t = np.asarray(times.get("ATT", []), dtype=float)
+        big = np.where((np.abs(roll) > 60) | (np.abs(pitch) > 60))[0]
+        if len(big) > 0 and len(att_t) == len(roll):
+            # Cluster into one event per ~2 sec
+            last_t = -1e18
+            for idx in big:
+                t = float(att_t[idx])
+                if t - last_t > 2.0:
+                    events.append({
+                        "t": t,
+                        "title": "Extreme tilt",
+                        "detail": f"Roll/pitch exceeded 60° (R={roll[idx]:.0f}°, P={pitch[idx]:.0f}°)",
+                        "severity": 3,
+                    })
+                    last_t = t
+
+    # 3. Rapid altitude drop (descent > 12 m/s sustained for >0.5s)
+    if "POS" in data and "Alt" in data["POS"]:
+        alt = np.asarray(data["POS"]["Alt"], dtype=float)
+        pt = np.asarray(times.get("POS", []), dtype=float)
+        if len(pt) == len(alt) and len(pt) > 4:
+            dt = np.diff(pt)
+            dz = np.diff(alt)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                vz = np.where(dt > 0, dz / dt, 0)
+            big = np.where(vz < -12)[0]
+            last_t = -1e18
+            for idx in big:
+                t = float(pt[idx + 1])
+                if t - last_t > 1.5:
+                    events.append({
+                        "t": t,
+                        "title": "Rapid descent",
+                        "detail": f"Vertical speed reached {vz[idx]:.1f} m/s (≈free-fall threshold)",
+                        "severity": 3,
+                    })
+                    last_t = t
+
+    # 4. Battery low (per-cell estimate < 3.3V under load)
+    bat = None
+    for k in ("BAT", "BAT1", "BATT"):
+        if k in data and "Volt" in data[k]:
+            bat = (k, data[k]); break
+    if bat:
+        bt = np.asarray(times.get(bat[0], []), dtype=float)
+        v = np.asarray(bat[1]["Volt"], dtype=float)
+        if len(bt) == len(v) and len(v) > 5:
+            v_start = float(np.median(v[: max(1, len(v) // 20)]))
+            cells = round(v_start / 3.85) if v_start > 5 else 0
+            if cells:
+                per_cell = v / cells
+                low = np.where(per_cell < 3.3)[0]
+                if len(low) > 0:
+                    events.append({
+                        "t": float(bt[low[0]]),
+                        "title": "Battery critical",
+                        "detail": f"Per-cell voltage dropped below 3.3V ({per_cell[low[0]]:.2f}V/cell)",
+                        "severity": 2,
+                    })
+
+    # 5. EKF failsafe innovations (>1.0)
+    xkf = data.get("XKF4") or data.get("NKF4")
+    xkf_key = "XKF4" if "XKF4" in data else ("NKF4" if "NKF4" in data else None)
+    if xkf and xkf_key and "SV" in xkf and "SP" in xkf and xkf_key in times:
+        xt = np.asarray(times[xkf_key], dtype=float)
+        sv = np.asarray(xkf["SV"], dtype=float)
+        sp = np.asarray(xkf["SP"], dtype=float)
+        if len(xt) == len(sv):
+            bad = np.where((sv > 1.0) | (sp > 1.0))[0]
+            if len(bad) > 0:
+                events.append({
+                    "t": float(xt[bad[0]]),
+                    "title": "EKF stress",
+                    "detail": f"EKF innovation peaked above 1.0 (loss-of-fix or sensor disagreement)",
+                    "severity": 2,
+                })
+
+    # 6. RC failsafe (RCIN.C1 < 900)
+    if "RCIN" in data and "C1" in data["RCIN"]:
+        c1 = np.asarray(data["RCIN"]["C1"], dtype=float)
+        rt = np.asarray(times.get("RCIN", []), dtype=float)
+        bad = np.where(c1 < 900)[0]
+        if len(rt) == len(c1) and len(bad) > 0:
+            events.append({
+                "t": float(rt[bad[0]]),
+                "title": "RC failsafe",
+                "detail": f"RC signal dropped to failsafe level ({int(c1[bad[0]])} µs)",
+                "severity": 2,
+            })
+
+    events.sort(key=lambda e: e["t"])
+    return events
 
 
 class LogParseWorker(QThread):
@@ -1574,8 +1769,17 @@ class LogParseWorker(QThread):
     def run(self):
         # Open WITHOUT zero_time_base so pymavlink fills in real wall-clock
         # timestamps from GPS week/ms — _timestamp becomes Unix epoch seconds.
+        path_lower = self.path.lower()
         try:
-            mlog = DFReader.DFReader_binary(self.path)
+            if path_lower.endswith(".tlog") or path_lower.endswith(".log"):
+                # MAVLink telemetry log (ground-station recorded). pymavlink's
+                # mavutil auto-detects MAVLink versions.
+                from pymavlink import mavutil
+                mlog = mavutil.mavlink_connection(
+                    self.path, dialect="ardupilotmega", robust_parsing=True
+                )
+            else:
+                mlog = DFReader.DFReader_binary(self.path)
         except Exception as exc:
             self.error.emit(f"Could not open log: {exc}")
             return
@@ -1645,12 +1849,22 @@ class LogParseWorker(QThread):
 
 
 class IstanbulTimeAxis(pg.AxisItem):
-    """X axis that displays Unix-epoch seconds as Istanbul wall-clock time."""
+    """X axis that displays elapsed seconds (small range, fast) as Istanbul
+    wall-clock time. Pass `t_start` (Unix epoch) so labels show real time."""
+    def __init__(self, *args, t_start: float = 0.0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._t_start = float(t_start)
+
+    def set_t_start(self, t_start: float):
+        self._t_start = float(t_start)
+        self.picture = None  # invalidate cache
+        self.update()
+
     def tickStrings(self, values, scale, spacing):
         out = []
         for v in values:
             try:
-                dt = datetime.fromtimestamp(float(v), tz=ISTANBUL_TZ)
+                dt = datetime.fromtimestamp(float(v) + self._t_start, tz=ISTANBUL_TZ)
             except (OSError, OverflowError, ValueError):
                 out.append("")
                 continue
@@ -1666,13 +1880,18 @@ class IstanbulTimeAxis(pg.AxisItem):
 class CrosshairPlot(pg.PlotWidget):
     """PlotWidget with a vertical crosshair that reports time-of-day + y."""
     def __init__(self, status_label: QtWidgets.QLabel, parent=None):
-        axis = IstanbulTimeAxis(orientation="bottom")
-        super().__init__(parent, axisItems={"bottom": axis})
+        self.time_axis = IstanbulTimeAxis(orientation="bottom")
+        super().__init__(parent, axisItems={"bottom": self.time_axis})
         self.status_label = status_label
+        self._t_start = 0.0
         self.vline = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen(ACCENT, width=1, style=Qt.PenStyle.DashLine))
         self.addItem(self.vline, ignoreBounds=True)
         self.vline.hide()
         self.scene().sigMouseMoved.connect(self._on_mouse)
+
+    def set_t_start(self, t_start: float):
+        self._t_start = float(t_start)
+        self.time_axis.set_t_start(t_start)
 
     def _on_mouse(self, pos):
         if not self.sceneBoundingRect().contains(pos):
@@ -1681,8 +1900,9 @@ class CrosshairPlot(pg.PlotWidget):
         x, y = view.x(), view.y()
         self.vline.setPos(x)
         self.vline.show()
+        # x is relative seconds — add t_start for wall-clock display
         self.status_label.setText(
-            f"◇   {fmt_istanbul(x, with_date=False)}  TR     y = {y:0.4f}"
+            f"◇   {fmt_istanbul(x + self._t_start, with_date=False)}  TR     y = {y:0.4f}"
         )
 
 
@@ -1696,18 +1916,52 @@ class MainWindow(QtWidgets.QMainWindow):
         self.curves: dict[tuple[str, str], pg.PlotDataItem] = {}
         self.color_idx = 0
         self.worker: LogParseWorker | None = None
+        self.recent_files: list[str] = self._load_recent_files()
 
         self._build_menu()
         self._build_ui()
+        # Drag-and-drop a .bin/.tlog/.log onto the window to open it
+        self.setAcceptDrops(True)
+
+    # ----- Drag and drop -----
+    def dragEnterEvent(self, e: QtGui.QDragEnterEvent):
+        if e.mimeData().hasUrls():
+            for url in e.mimeData().urls():
+                p = url.toLocalFile().lower()
+                if p.endswith((".bin", ".tlog", ".log")):
+                    e.acceptProposedAction()
+                    return
+        e.ignore()
+
+    def dropEvent(self, e: QtGui.QDropEvent):
+        for url in e.mimeData().urls():
+            p = url.toLocalFile()
+            if p.lower().endswith((".bin", ".tlog", ".log")):
+                self.load_file(p)
+                e.acceptProposedAction()
+                return
 
     # ----- UI -----
     def _build_menu(self):
         bar = self.menuBar()
         file_menu = bar.addMenu("&File")
-        open_act = QtGui.QAction("&Open .bin…", self)
+        open_act = QtGui.QAction("&Open log…", self)
         open_act.setShortcut("Ctrl+O")
         open_act.triggered.connect(self.open_file)
         file_menu.addAction(open_act)
+
+        self.recent_menu = file_menu.addMenu("Open &Recent")
+        self._rebuild_recent_menu()
+
+        file_menu.addSeparator()
+        report_act = QtGui.QAction("Export flight &report (PDF)…", self)
+        report_act.setShortcut("Ctrl+R")
+        report_act.triggered.connect(self.export_pdf_report)
+        file_menu.addAction(report_act)
+        csv_act = QtGui.QAction("Export plotted &series to CSV…", self)
+        csv_act.triggered.connect(self.export_plot_csv)
+        file_menu.addAction(csv_act)
+
         file_menu.addSeparator()
         quit_act = QtGui.QAction("&Quit", self)
         quit_act.setShortcut("Ctrl+Q")
@@ -1718,6 +1972,212 @@ class MainWindow(QtWidgets.QMainWindow):
         clear_act = QtGui.QAction("Clear plot", self)
         clear_act.triggered.connect(self.clear_plot)
         view_menu.addAction(clear_act)
+
+    # ----- Recent files -----
+    @staticmethod
+    def _recent_files_path() -> Path:
+        return Path.home() / ".uav_log_viewer_recent.json"
+
+    def _load_recent_files(self) -> list[str]:
+        p = self._recent_files_path()
+        if not p.exists():
+            return []
+        try:
+            with open(p) as f:
+                data = json.load(f)
+            return [str(x) for x in data if isinstance(x, str) and Path(x).exists()][:10]
+        except Exception:
+            return []
+
+    def _save_recent_files(self):
+        try:
+            with open(self._recent_files_path(), "w") as f:
+                json.dump(self.recent_files, f)
+        except Exception:
+            pass
+
+    def _push_recent(self, path: str):
+        p = str(Path(path).resolve())
+        if p in self.recent_files:
+            self.recent_files.remove(p)
+        self.recent_files.insert(0, p)
+        self.recent_files = self.recent_files[:10]
+        self._save_recent_files()
+        self._rebuild_recent_menu()
+
+    def _rebuild_recent_menu(self):
+        if not hasattr(self, "recent_menu"):
+            return
+        self.recent_menu.clear()
+        if not self.recent_files:
+            empty = QtGui.QAction("(no recent files)", self)
+            empty.setEnabled(False)
+            self.recent_menu.addAction(empty)
+            return
+        for path in self.recent_files:
+            short = Path(path).name
+            act = QtGui.QAction(short, self)
+            act.setToolTip(path)
+            act.triggered.connect(lambda checked=False, p=path: self.load_file(p))
+            self.recent_menu.addAction(act)
+        self.recent_menu.addSeparator()
+        clear = QtGui.QAction("Clear list", self)
+        clear.triggered.connect(self._clear_recent)
+        self.recent_menu.addAction(clear)
+
+    def _clear_recent(self):
+        self.recent_files = []
+        self._save_recent_files()
+        self._rebuild_recent_menu()
+
+    # ----- PDF flight report -----
+    def export_pdf_report(self):
+        if self.parsed is None:
+            QtWidgets.QMessageBox.information(
+                self, "No log loaded", "Open a flight log before exporting a report.")
+            return
+        suggested = Path(self.parsed["path"]).with_suffix(".pdf").name
+        out, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save flight report", suggested, "PDF (*.pdf)"
+        )
+        if not out:
+            return
+        try:
+            html = self._build_report_html()
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Report failed", str(exc))
+            return
+        # Render to PDF via QTextDocument + QPrinter (no external deps)
+        doc = QtGui.QTextDocument()
+        doc.setHtml(html)
+        printer = QtPrintSupport.QPrinter(QtPrintSupport.QPrinter.PrinterMode.HighResolution)
+        printer.setOutputFormat(QtPrintSupport.QPrinter.OutputFormat.PdfFormat)
+        printer.setOutputFileName(out)
+        printer.setPageMargins(QtCore.QMarginsF(18, 18, 18, 22),
+                                QtGui.QPageLayout.Unit.Millimeter)
+        doc.print(printer)
+        self.statusBar().showMessage(f"Report saved → {out}")
+
+    def _build_report_html(self) -> str:
+        d = self.parsed
+        name = Path(d["path"]).name
+        start = fmt_istanbul(d["t_start"], with_date=True) if d.get("t_start") else "—"
+        end   = fmt_istanbul(d["t_end"],   with_date=True) if d.get("t_end")   else "—"
+        dur   = d.get("duration", 0)
+        items = auto_review(d)
+        incidents = detect_incidents(d)
+
+        # Color tokens for HTML (PDF uses these directly)
+        css = """
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0b1220; }
+          h1   { font-size: 22pt; margin: 0; letter-spacing: 3px; }
+          h2   { font-size: 13pt; color: #0d7a8a; margin: 22px 0 8px;
+                 letter-spacing: 2px; border-bottom: 1.5pt solid #0d7a8a;
+                 padding-bottom: 4px; }
+          .sub { color: #5a6678; font-size: 10pt; letter-spacing: 1px; margin-top:2px;}
+          table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+          td   { padding: 4px 6px; vertical-align: top; }
+          .meta td:first-child { color: #5a6678; width: 28%; font-weight: 600;
+                                 letter-spacing: 1px; font-size: 9pt; }
+          .card { border: 1pt solid #d6dde8; border-radius: 4pt; padding: 8pt 10pt;
+                  margin-bottom: 6pt; }
+          .card .cat { font-size: 11pt; font-weight: 700; }
+          .card .verdict { float: right; font-size: 9pt; font-weight: 700;
+                           letter-spacing: 1.5px; padding: 2pt 8pt; border-radius: 8pt;
+                           color: white; }
+          .vGood     { background: #15803d; }
+          .vMarginal { background: #b45309; }
+          .vBad      { background: #b91c1c; }
+          .vInfo     { background: #0d7a8a; }
+          .card .head { font-size: 10pt; margin-top: 4pt; }
+          .card .det  { font-size: 9pt; color: #5a6678; margin-top: 2pt; }
+          .footer { color:#5a6678; font-size:8pt; margin-top:20pt;
+                    text-align:center; letter-spacing:2px; }
+        """
+        rows = []
+        rows.append(f"<h1>◆ UAV FLIGHT REPORT</h1>")
+        rows.append(f"<div class='sub'>{name}</div>")
+        rows.append("<h2>SUMMARY</h2>")
+        rows.append("<table class='meta'>"
+                    f"<tr><td>FILE</td><td>{name}</td></tr>"
+                    f"<tr><td>START (TR)</td><td>{start}</td></tr>"
+                    f"<tr><td>END (TR)</td><td>{end}</td></tr>"
+                    f"<tr><td>DURATION</td><td>{dur:0.1f} s ({dur/60:0.2f} min)</td></tr>"
+                    f"<tr><td>MESSAGES</td><td>{d.get('count', 0):,}</td></tr>"
+                    f"<tr><td>VEHICLE TYPE</td><td>{d.get('vehicle_type','—')}</td></tr>"
+                    "</table>")
+        # Mode timeline
+        mode = d["data"].get("MODE")
+        mode_t = d["times"].get("MODE")
+        if mode and "Mode" in mode and mode_t is not None and len(mode_t):
+            mfield = mode["Mode"]
+            seen = []
+            for t, m in zip(mode_t, mfield):
+                if not seen or seen[-1][1] != m:
+                    seen.append((float(t), m))
+            rows.append("<h2>FLIGHT MODE TIMELINE</h2><table>")
+            for t, m in seen:
+                rows.append(f"<tr><td style='font-family:monospace;color:#5a6678;width:30%'>"
+                            f"{fmt_istanbul(t)}</td><td><b>{m}</b></td></tr>")
+            rows.append("</table>")
+        # Auto review cards
+        rows.append("<h2>HEALTH REVIEW</h2>")
+        verdict_class = {"Good":"vGood","Marginal":"vMarginal","Bad":"vBad","Info":"vInfo"}
+        for it in items:
+            cls = verdict_class.get(it["verdict"], "vInfo")
+            rows.append(
+                f"<div class='card'>"
+                f"<span class='verdict {cls}'>{it['verdict'].upper()}</span>"
+                f"<div class='cat'>{it['category']}</div>"
+                f"<div class='head'>{it['headline']}</div>"
+                + (f"<div class='det'>{it['detail']}</div>" if it.get("detail") else "")
+                + "</div>"
+            )
+        # Incidents
+        if incidents:
+            rows.append("<h2>INCIDENTS DETECTED</h2><table>")
+            for ev in incidents:
+                rows.append(
+                    f"<tr><td style='font-family:monospace;color:#5a6678;width:25%'>"
+                    f"{fmt_istanbul(ev['t'])}</td>"
+                    f"<td><b>{ev['title']}</b><br>"
+                    f"<span style='color:#5a6678;font-size:9pt'>{ev['detail']}</span></td></tr>"
+                )
+            rows.append("</table>")
+        rows.append("<div class='footer'>UAV LOG VIEWER  ·  CREATED BY JAVID</div>")
+        return f"<html><head><style>{css}</style></head><body>" + "".join(rows) + "</body></html>"
+
+    # ----- CSV export of plotted curves -----
+    def export_plot_csv(self):
+        if not self.curves:
+            QtWidgets.QMessageBox.information(
+                self, "Nothing to export", "Tick some fields on the PLOT tab first.")
+            return
+        out, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Export plotted series to CSV", "flight_data.csv", "CSV (*.csv)"
+        )
+        if not out:
+            return
+        t_start = self.parsed.get("t_start") or 0.0 if self.parsed else 0.0
+        # Build a union time grid by interpolation onto first curve's x
+        # (cheap: write each curve as its own (time, value) pair set)
+        try:
+            with open(out, "w") as f:
+                # Per-curve sections
+                for (mtype, field), curve in self.curves.items():
+                    f.write(f"# {mtype}.{field}\n")
+                    f.write("time_iso,time_unix,seconds_since_start,value\n")
+                    x = self.parsed["times"][mtype]
+                    y = self.parsed["data"][mtype][field]
+                    n = min(len(x), len(y))
+                    for i in range(n):
+                        tu = float(x[i])
+                        iso = fmt_istanbul(tu, with_date=True)
+                        f.write(f"{iso},{tu:.6f},{tu - t_start:.6f},{float(y[i])}\n")
+                    f.write("\n")
+            self.statusBar().showMessage(f"CSV saved → {out}  ({len(self.curves)} series)")
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "CSV export failed", str(exc))
 
     def _build_ui(self):
         # Root container with header on top, splitter below
@@ -1887,6 +2347,12 @@ class MainWindow(QtWidgets.QMainWindow):
             f"font-family: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace; font-size:11px;"
         )
         self.plot = CrosshairPlot(self.cursor_label)
+        # Performance: only render the visible window, and downsample with
+        # peak-preserving mode so dense curves don't drown the GPU/CPU.
+        # Without these, a single 3,500-point antialiased curve can take
+        # nearly a second to paint per redraw on macOS.
+        self.plot.setClipToView(True)
+        self.plot.setDownsampling(auto=True, mode="peak")
         self.plot.addLegend(
             offset=(10, 10),
             brush=pg.mkBrush(BG_2),
@@ -1914,6 +2380,77 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view3d.loadFinished.connect(self._on_3d_loaded)
         self._set_3d_points(None)
         self.tabs.addTab(self.view3d, "  3D  ")
+
+        # FFT vibration tab — three stacked spectrum plots
+        fft_container = QtWidgets.QWidget()
+        fft_layout = QtWidgets.QVBoxLayout(fft_container)
+        fft_layout.setContentsMargins(8, 8, 8, 8)
+        fft_layout.setSpacing(6)
+        fft_header = QtWidgets.QLabel("VIBRATION FREQUENCY SPECTRUM")
+        fft_header.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-weight:700;"
+            f"letter-spacing:2px; padding:4px 6px;"
+        )
+        fft_layout.addWidget(fft_header)
+        self.fft_info = QtWidgets.QLabel(
+            "  Open a log with IMU messages to see motor / airframe resonance peaks.")
+        self.fft_info.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; padding:4px 10px;"
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:6px;"
+            f"font-family: 'JetBrains Mono', monospace;"
+        )
+        fft_layout.addWidget(self.fft_info)
+        self.fft_plots = []
+        for axis in ("X", "Y", "Z"):
+            p = pg.PlotWidget()
+            p.setBackground(BG_1)
+            p.showGrid(x=True, y=True, alpha=0.15)
+            p.setLabel("bottom", f"Frequency · {axis} axis", units="Hz", color=TEXT_DIM)
+            p.setLabel("left", "Magnitude (m/s²)", color=TEXT_DIM)
+            p.setClipToView(True)
+            p.setDownsampling(auto=True, mode="peak")
+            for ax in ("left", "bottom"):
+                a = p.getAxis(ax)
+                a.setPen(pg.mkPen(BORDER))
+                a.setTextPen(pg.mkPen(TEXT_DIM))
+            self.fft_plots.append(p)
+            fft_layout.addWidget(p, 1)
+        self.tabs.addTab(fft_container, "  FFT  ")
+
+        # PID tuning helper — desired vs actual Roll/Pitch/Yaw
+        pid_container = QtWidgets.QWidget()
+        pid_layout = QtWidgets.QVBoxLayout(pid_container)
+        pid_layout.setContentsMargins(8, 8, 8, 8)
+        pid_layout.setSpacing(6)
+        pid_header = QtWidgets.QLabel("PID TUNING · DESIRED VS ACTUAL ATTITUDE")
+        pid_header.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-weight:700;"
+            f"letter-spacing:2px; padding:4px 6px;"
+        )
+        pid_layout.addWidget(pid_header)
+        self.pid_info = QtWidgets.QLabel(
+            "  Open a log with ATT messages to compare commanded vs actual attitude.")
+        self.pid_info.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; padding:4px 10px;"
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:6px;"
+            f"font-family: 'JetBrains Mono', monospace;"
+        )
+        pid_layout.addWidget(self.pid_info)
+        self.pid_plots = []
+        for axis in ("ROLL", "PITCH", "YAW"):
+            p = pg.PlotWidget(axisItems={"bottom": IstanbulTimeAxis(orientation="bottom")})
+            p.setBackground(BG_1)
+            p.showGrid(x=True, y=True, alpha=0.15)
+            p.setLabel("bottom", f"{axis}", color=TEXT_DIM)
+            p.setLabel("left", "deg", color=TEXT_DIM)
+            p.setClipToView(True)
+            p.setDownsampling(auto=True, mode="peak")
+            for ax in ("left", "bottom"):
+                a = p.getAxis(ax); a.setPen(pg.mkPen(BORDER)); a.setTextPen(pg.mkPen(TEXT_DIM))
+            p.addLegend(brush=pg.mkBrush(BG_2), pen=pg.mkPen(BORDER), labelTextColor=TEXT)
+            self.pid_plots.append(p)
+            pid_layout.addWidget(p, 1)
+        self.tabs.addTab(pid_container, "  PID  ")
 
         # Instruments tab (cockpit: attitude, heading, altitude, sticks)
         self.instruments_view = QWebEngineView()
@@ -1954,7 +2491,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def open_file(self):
         start_dir = str(Path(__file__).parent)
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open ArduPilot DataFlash log", start_dir, "Binary logs (*.bin);;All files (*)"
+            self, "Open flight log", start_dir,
+            "Flight logs (*.bin *.BIN *.tlog *.TLOG *.log);;DataFlash binary (*.bin);;MAVLink telemetry (*.tlog);;All files (*)"
         )
         if not path:
             return
@@ -1967,6 +2505,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tree.clear()
         self.clear_plot()
         self.info_text.clear()
+        self._push_recent(path)
         self.worker = LogParseWorker(path)
         self.worker.progress.connect(self._on_progress)
         self.worker.done.connect(self._on_parsed)
@@ -1982,6 +2521,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_parsed(self, result: dict):
         self.parsed = result
+        # Make the plot axis show wall-clock Istanbul time without losing
+        # float precision (X values stay as small "seconds since log start").
+        t0 = result.get("t_start") or 0.0
+        self.plot.set_t_start(t0)
+        for pid_plot in getattr(self, "pid_plots", []):
+            ax = pid_plot.getAxis("bottom")
+            if hasattr(ax, "set_t_start"):
+                ax.set_t_start(t0)
         name = Path(result["path"]).name
         start_txt = fmt_istanbul(result["t_start"], with_date=True) if result.get("t_start") else "—"
         msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} TR"
@@ -2005,6 +2552,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_map()
         self._populate_3d()
         self._populate_instruments()
+        self._populate_fft()
+        self._populate_pid()
         self._populate_review()
 
     # ----- Tree -----
@@ -2069,7 +2618,10 @@ class MainWindow(QtWidgets.QMainWindow):
         key = (mtype, field)
         if key in self.curves or self.parsed is None:
             return
-        x = self.parsed["times"][mtype]
+        # Subtract t_start so X values are small (~0–duration_sec). Plotting at
+        # Unix-timestamp magnitudes (~1.7e9) is multi-second slow in pyqtgraph.
+        t_start = self.parsed.get("t_start") or 0.0
+        x = self.parsed["times"][mtype] - t_start
         y = self.parsed["data"][mtype][field]
         if len(x) == 0:
             return
@@ -2475,16 +3027,110 @@ class MainWindow(QtWidgets.QMainWindow):
         if not ok:
             self.statusBar().showMessage("Instruments view failed to load.")
 
+    # ----- FFT vibration tab -----
+    def _populate_fft(self):
+        for p in self.fft_plots:
+            p.clear()
+        if self.parsed is None:
+            self.fft_info.setText("  No log loaded.")
+            return
+        imu = self.parsed["data"].get("IMU")
+        imu_t = self.parsed["times"].get("IMU")
+        if not imu or imu_t is None or len(imu_t) < 256:
+            self.fft_info.setText("  Not enough IMU samples for FFT (need ≥256).")
+            return
+        t = np.asarray(imu_t, dtype=float)
+        dts = np.diff(t)
+        dts = dts[dts > 0]
+        if len(dts) == 0:
+            self.fft_info.setText("  IMU timestamps unusable.")
+            return
+        fs = 1.0 / float(np.median(dts))
+        self.fft_info.setText(
+            f"  IMU sample rate ≈ {fs:.0f} Hz  ·  Nyquist {fs/2:.0f} Hz  ·  "
+            f"{len(t):,} samples  ·  peaks near motor RPM/60 = resonance"
+        )
+        peak_colors = ["#22d3ee", "#a78bfa", "#fbbf24"]
+        for k, axis_field in enumerate(("AccX", "AccY", "AccZ")):
+            plot = self.fft_plots[k]
+            arr = imu.get(axis_field)
+            if arr is None or len(arr) < 256:
+                continue
+            sig = np.asarray(arr, dtype=float)
+            sig = sig - np.mean(sig)
+            n = len(sig)
+            # Hann window for cleaner peaks
+            win = np.hanning(n)
+            spec = np.abs(np.fft.rfft(sig * win)) * (2.0 / np.sum(win))
+            freqs = np.fft.rfftfreq(n, d=1.0 / fs)
+            # Drop the DC bin
+            freqs = freqs[1:]; spec = spec[1:]
+            plot.plot(freqs, spec, pen=pg.mkPen(peak_colors[k], width=1.5),
+                      name=f"Acc{axis_field[-1]}")
+            # Annotate top 3 peaks
+            if len(spec) > 10:
+                top_idx = np.argpartition(spec, -3)[-3:]
+                top_idx = top_idx[np.argsort(spec[top_idx])][::-1]
+                for idx in top_idx:
+                    f = float(freqs[idx])
+                    if f < 2: continue  # ignore near-DC drift
+                    line = pg.InfiniteLine(pos=f, angle=90,
+                        pen=pg.mkPen("#f87171", style=Qt.PenStyle.DashLine, width=1),
+                        label=f"{f:.1f} Hz",
+                        labelOpts={"position":0.92, "color":"#f87171",
+                                   "fill":pg.mkBrush(BG_2)})
+                    plot.addItem(line, ignoreBounds=True)
+            plot.setXRange(0, fs / 2)
+
+    # ----- PID tuning tab -----
+    def _populate_pid(self):
+        for p in self.pid_plots:
+            p.clear()
+        if self.parsed is None:
+            self.pid_info.setText("  No log loaded.")
+            return
+        d = self.parsed["data"]
+        t_start = self.parsed.get("t_start") or 0.0
+        att = d.get("ATT")
+        att_t = self.parsed["times"].get("ATT")
+        if not att or att_t is None or len(att_t) < 10:
+            self.pid_info.setText("  No ATT (attitude) messages — can't compare desired vs actual.")
+            return
+        x = np.asarray(att_t, dtype=float) - t_start
+        pairs = [
+            ("Roll",  "DesRoll",  "ROLL  · cyan = command,  amber = actual"),
+            ("Pitch", "DesPitch", "PITCH · cyan = command,  amber = actual"),
+            ("Yaw",   "DesYaw",   "YAW   · cyan = command,  amber = actual"),
+        ]
+        n_traces = 0
+        for k, (actual, desired, _title) in enumerate(pairs):
+            plot = self.pid_plots[k]
+            if actual in att:
+                plot.plot(x, np.asarray(att[actual], dtype=float),
+                          pen=pg.mkPen("#fbbf24", width=1.5), name=actual)
+                n_traces += 1
+            if desired in att:
+                plot.plot(x, np.asarray(att[desired], dtype=float),
+                          pen=pg.mkPen("#22d3ee", width=1.5, style=Qt.PenStyle.DashLine),
+                          name=desired)
+        if n_traces == 0:
+            self.pid_info.setText("  ATT has no Roll/Pitch/Yaw — incompatible log.")
+        else:
+            self.pid_info.setText(
+                "  Cyan dashed = pilot/autopilot command.  Amber solid = vehicle response."
+                "  Large gap → controller can't keep up (loose tuning)."
+                "  Oscillation around command → gain too high."
+            )
+
     # ----- Map tab -----
     def _populate_map(self):
-        coords = self._extract_track()
-        self._set_map_coords(coords)
+        track = self._extract_track()
+        self._set_map_coords(track)
 
-    def _extract_track(self) -> list[list[float]]:
-        """Return a clean lat/lng track. Prefer POS (EKF-smoothed) over raw GPS."""
+    def _extract_track(self) -> dict:
+        """Return a clean lat/lng/alt track. Prefer POS (EKF-smoothed) over raw GPS."""
         if self.parsed is None:
-            return []
-        # POS first — fewer outliers, no noisy pre-fix points
+            return {"coords": [], "alts": []}
         for mt in ("POS", "GPS", "GPS2"):
             block = self.parsed["data"].get(mt)
             if not block:
@@ -2496,18 +3142,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
             lats = np.asarray(block[lat_key], dtype=float)
             lngs = np.asarray(block[lng_key], dtype=float)
+            alts = np.asarray(block.get("Alt", np.zeros_like(lats)), dtype=float)
             if len(lats) == 0:
                 continue
 
-            # Older logs store lat/lng as int * 1e7 — pymavlink usually scales
-            # already, but guard for edge cases.
             if np.nanmax(np.abs(lats)) > 200:
                 lats = lats / 1e7
                 lngs = lngs / 1e7
 
-            # Drop zero/null fixes
             mask = (np.abs(lats) > 0.0001) & (np.abs(lngs) > 0.0001)
-            # If GPS, also require a 3D fix and decent satellite count
             if mt.startswith("GPS"):
                 status = block.get("Status")
                 nsats = block.get("NSats")
@@ -2516,29 +3159,31 @@ class MainWindow(QtWidgets.QMainWindow):
                 if nsats is not None:
                     mask &= np.asarray(nsats, dtype=float) >= 4
 
-            lats = lats[mask]
-            lngs = lngs[mask]
+            lats = lats[mask]; lngs = lngs[mask]; alts = alts[mask]
             if len(lats) < 2:
                 continue
 
-            # Tighten — drop single-point outliers > 1 km from the median
             med_la, med_lo = float(np.median(lats)), float(np.median(lngs))
             jump_mask = (np.abs(lats - med_la) < 0.01) & (np.abs(lngs - med_lo) < 0.01)
-            lats = lats[jump_mask]
-            lngs = lngs[jump_mask]
+            lats = lats[jump_mask]; lngs = lngs[jump_mask]; alts = alts[jump_mask]
             if len(lats) < 2:
                 continue
 
-            # Downsample for Leaflet
-            if len(lats) > 5000:
-                step = len(lats) // 5000
-                lats = lats[::step]
-                lngs = lngs[::step]
-            return [[float(la), float(lo)] for la, lo in zip(lats, lngs)]
-        return []
+            # Downsample (max 3000 segments — colored polylines are heavier than a single line)
+            if len(lats) > 3000:
+                step = len(lats) // 3000
+                lats = lats[::step]; lngs = lngs[::step]; alts = alts[::step]
+            return {
+                "coords": [[float(la), float(lo)] for la, lo in zip(lats, lngs)],
+                "alts": [float(a) for a in alts],
+            }
+        return {"coords": [], "alts": []}
 
-    def _set_map_coords(self, coords: list[list[float]]):
-        html = MAP_HTML_TEMPLATE.replace("__COORDS__", json.dumps(coords))
+    def _set_map_coords(self, track):
+        # Back-compat: list of [lat,lng] still works
+        if isinstance(track, list):
+            track = {"coords": track, "alts": []}
+        html = MAP_HTML_TEMPLATE.replace("__TRACK__", json.dumps(track))
         # setHtml with a real https base URL — lets QtWebEngine load https
         # scripts (Leaflet from unpkg) and tiles (Esri/CARTO) without the
         # file:// "null origin" mixed-content restrictions.
