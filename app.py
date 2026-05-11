@@ -84,8 +84,9 @@ PLOT_COLORS = [
 APP_QSS = f"""
 * {{
     color: {TEXT};
-    font-family: "Segoe UI", "Helvetica Neue", "Inter", Arial, sans-serif;
+    font-family: "Inter", "Helvetica Neue", "Segoe UI", -apple-system, Arial, sans-serif;
     font-size: 13px;
+    font-weight: 400;
 }}
 QMainWindow, QWidget {{
     background-color: {BG_0};
@@ -119,7 +120,7 @@ QStatusBar {{
     background: {BG_0};
     border-top: 1px solid {BORDER};
     color: {TEXT_DIM};
-    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-family: "JetBrains Mono", "SF Mono", Menlo, "Cascadia Code", Consolas, monospace;
     font-size: 11px;
     letter-spacing: 0.5px;
     min-height: 26px;
@@ -226,7 +227,7 @@ QPlainTextEdit, QTextEdit {{
     border: 1px solid {BORDER};
     border-radius: 8px;
     padding: 12px;
-    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-family: "JetBrains Mono", "SF Mono", Menlo, "Cascadia Code", Consolas, monospace;
     font-size: 12px;
     selection-background-color: {ACCENT};
     selection-color: {BG_0};
@@ -294,14 +295,475 @@ QFrame#statTile {{
 }}
 """
 
+INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8" />
+<title>Instruments</title>
+<style>
+  html,body{height:100%;margin:0;padding:0;background:#0b1220;
+            font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;
+            color:#e6edf7;overflow:hidden;user-select:none}
+  .empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+         padding:18px 24px;background:#111a2e;border:1px solid #243154;
+         color:#8b97b3;border-radius:8px;text-align:center}
+  #wrap{height:100vh;display:flex;flex-direction:column;padding:14px;gap:12px;box-sizing:border-box}
+  .row{display:grid;gap:14px;min-height:0}
+  #row-instruments{grid-template-columns:repeat(4,1fr);flex:1 1 280px}
+  #row-sticks{flex:0 0 220px}
+  #ctrl{flex:0 0 auto}
+  .panel{background:linear-gradient(180deg,#16223c 0%,#111a2e 100%);
+         border:1px solid #243154;border-radius:12px;
+         padding:14px;display:flex;flex-direction:column;align-items:center;
+         min-height:0;box-shadow:0 4px 18px rgba(0,0,0,0.25)}
+  .panel h3{margin:0 0 10px;color:#8b97b3;font-size:10px;letter-spacing:2.5px;
+            font-weight:700;text-align:center}
+  .panel svg{flex:1;min-height:0;width:100%}
+  .readout{margin-top:8px;font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
+           color:#22d3ee;font-size:13px;font-weight:700;letter-spacing:1px;
+           text-align:center;white-space:nowrap}
+  .readout .dim{color:#8b97b3;font-weight:400;letter-spacing:1.5px;font-size:10px}
+
+  /* Radio transmitter — single teal-cyan housing with two circular gimbals */
+  .rc-housing{
+    background:linear-gradient(180deg,#0f9d9e 0%,#0d7a8a 100%);
+    border:1px solid #22d3ee;border-radius:18px;
+    box-shadow:0 8px 26px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+    padding:18px 24px;
+    display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;
+    position:relative;min-height:0
+  }
+  .rc-housing::before, .rc-housing::after{
+    content:'';position:absolute;width:14px;height:14px;color:#e6edf7;opacity:0.5;font-size:14px
+  }
+  .rc-housing::before{top:10px;left:14px;content:'✥'}
+  .rc-housing::after{bottom:10px;right:14px;content:'▲';transform:rotate(45deg)}
+  .gimbal-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:0}
+  .gimbal-wrap svg{flex:1;min-height:0;width:100%;max-width:200px}
+  .gimbal-label{font-size:9px;letter-spacing:2.5px;font-weight:700;color:#0b1220;text-align:center;text-transform:uppercase}
+  .gimbal-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;color:#0b1220;
+                  font-size:11px;font-weight:700;letter-spacing:0.5px;text-align:center;white-space:nowrap}
+
+  /* Control bar — always visible at bottom */
+  #ctrl{display:flex;align-items:center;gap:14px;padding:12px 18px;
+        background:#111a2e;border:1px solid #243154;border-radius:12px;
+        flex-shrink:0;flex-wrap:wrap}
+  .btn{background:#22d3ee;color:#0b1220;font-weight:800;letter-spacing:1.5px;
+       font-size:11px;padding:9px 18px;border-radius:6px;cursor:pointer;
+       border:1px solid #22d3ee;font-family:inherit;transition:all 0.15s;
+       box-shadow:0 0 12px rgba(34,211,238,0.35)}
+  .btn:hover{background:#67e8f9;border-color:#67e8f9;box-shadow:0 0 18px rgba(34,211,238,0.55)}
+  .btn.alt{background:#16223c;color:#e6edf7;border-color:#243154;box-shadow:none}
+  .btn.alt:hover{background:#1d2c4d;border-color:#22d3ee;color:#22d3ee;box-shadow:0 0 12px rgba(34,211,238,0.25)}
+  .speed-group{display:flex;gap:4px;padding:3px;background:#0b1220;
+               border:1px solid #243154;border-radius:6px}
+  .speed-btn{background:transparent;color:#8b97b3;font-size:10px;font-weight:700;
+             letter-spacing:1px;padding:6px 10px;border:none;border-radius:4px;
+             cursor:pointer;font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
+             transition:all 0.15s}
+  .speed-btn:hover{color:#22d3ee;background:#16223c}
+  .speed-btn.active{background:#22d3ee;color:#0b1220}
+  #scrub{flex:1;-webkit-appearance:none;height:6px;background:#243154;
+         border-radius:3px;outline:none;cursor:pointer}
+  #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+         background:#22d3ee;border-radius:50%;border:2px solid #0b1220;cursor:pointer;
+         box-shadow:0 0 10px rgba(34,211,238,0.7)}
+  #time-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
+         color:#22d3ee;font-size:14px;font-weight:700;letter-spacing:1px;min-width:160px;text-align:right}
+  .ai-bg{fill:#0b1220}
+  .ai-sky{fill:#1d4ed8}
+  .ai-ground{fill:#854d0e}
+  .ai-horizon{stroke:#e6edf7;stroke-width:1.5}
+  .ai-pitch-tick{stroke:#e6edf7;stroke-width:1;stroke-linecap:round}
+  .ai-pitch-label{fill:#e6edf7;font-size:7px;font-family:"JetBrains Mono",monospace;font-weight:700}
+  .ai-frame{fill:none;stroke:#243154;stroke-width:2}
+  .ai-aircraft{fill:none;stroke:#fbbf24;stroke-width:2.5;stroke-linecap:round}
+  .ai-roll-tick{stroke:#e6edf7;stroke-width:1.2}
+  .ai-roll-pointer{fill:#fbbf24}
+  .hsi-card{fill:#0b1220;stroke:#243154}
+  .hsi-tick{stroke:#e6edf7;stroke-width:1.2;stroke-linecap:round}
+  .hsi-cardinal{fill:#22d3ee;font-size:14px;font-weight:800;font-family:"Inter",sans-serif;text-anchor:middle}
+  .hsi-deg{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;text-anchor:middle}
+  .hsi-aircraft{fill:#fbbf24;stroke:#0b1220;stroke-width:1}
+  .tape-bg{fill:#0b1220;stroke:#243154}
+  .tape-tick{stroke:#8b97b3;stroke-width:1}
+  .tape-tick-major{stroke:#e6edf7;stroke-width:1.5}
+  .tape-label{fill:#8b97b3;font-size:9px;font-family:"JetBrains Mono",monospace}
+  .tape-marker{fill:#22d3ee}
+  .tape-current{fill:#22d3ee;font-size:14px;font-weight:800;font-family:"JetBrains Mono",monospace;text-anchor:middle}
+  .stick-frame{fill:#0b1220;stroke:#243154;stroke-width:1.5}
+  .stick-cross{stroke:#243154;stroke-width:1}
+  .stick-dot{fill:#22d3ee;stroke:#0b1220;stroke-width:2}
+  .stick-axis{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;font-weight:600;letter-spacing:1.5px}
+</style>
+</head><body>
+<script>
+const D = __DATA__;
+if (!D) {
+  document.body.innerHTML = '<div class="empty">'
+    + '<div style="font-size:14px;color:#e6edf7;margin-bottom:4px">No instrument data</div>'
+    + '<div style="font-size:12px">This log is missing ATT or RCIN messages.</div></div>';
+} else {
+  document.body.innerHTML = `
+  <div id="wrap">
+    <div class="row" id="row-instruments">
+      <div class="panel">
+        <h3>ATTITUDE</h3>
+        <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
+          <defs><clipPath id="ai-clip"><circle cx="0" cy="0" r="80"/></clipPath></defs>
+          <circle class="ai-bg" cx="0" cy="0" r="92"/>
+          <g clip-path="url(#ai-clip)">
+            <g id="ai-roll-group">
+              <g id="ai-pitch-group">
+                <rect class="ai-sky" x="-200" y="-200" width="400" height="200"/>
+                <rect class="ai-ground" x="-200" y="0" width="400" height="200"/>
+                <line class="ai-horizon" x1="-200" y1="0" x2="200" y2="0"/>
+                <g id="ai-pitch-ladder"></g>
+              </g>
+            </g>
+          </g>
+          <circle class="ai-frame" cx="0" cy="0" r="80"/>
+          <!-- aircraft symbol -->
+          <g class="ai-aircraft">
+            <line x1="-30" y1="0" x2="-10" y2="0"/>
+            <line x1="30" y1="0" x2="10" y2="0"/>
+            <circle cx="0" cy="0" r="2.5" fill="#fbbf24"/>
+            <line x1="0" y1="-12" x2="0" y2="-4"/>
+          </g>
+          <!-- roll scale ticks -->
+          <g id="ai-roll-scale"></g>
+          <!-- roll pointer (fixed at top) -->
+          <polygon class="ai-roll-pointer" points="0,-80 -5,-72 5,-72"/>
+        </svg>
+        <div class="readout">
+          <span class="dim">ROLL</span> <span id="ai-roll-val">0°</span>
+          &nbsp;·&nbsp;
+          <span class="dim">PITCH</span> <span id="ai-pitch-val">0°</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>HEADING</h3>
+        <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
+          <circle class="hsi-card" cx="0" cy="0" r="88"/>
+          <g id="hsi-rose"></g>
+          <!-- aircraft symbol pointing up (fixed) -->
+          <polygon class="hsi-aircraft" points="0,-58 -8,-44 -2,-44 -2,-30 -14,-30 -14,-24 -2,-24 -2,8 -10,14 -10,18 0,15 10,18 10,14 2,8 2,-24 14,-24 14,-30 2,-30 2,-44 8,-44"/>
+          <!-- top pointer (fixed) -->
+          <polygon fill="#fbbf24" points="0,-90 -5,-78 5,-78"/>
+        </svg>
+        <div class="readout">
+          <span class="dim">HDG</span> <span id="hsi-hdg-val">000°</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>ALTITUDE</h3>
+        <svg viewBox="-30 -100 60 200" preserveAspectRatio="xMidYMid meet">
+          <rect class="tape-bg" x="-25" y="-90" width="50" height="180" rx="4"/>
+          <g id="alt-tape"></g>
+          <!-- current value box -->
+          <rect x="-26" y="-12" width="52" height="24" fill="#16223c" stroke="#22d3ee" stroke-width="1.5"/>
+          <text id="alt-tape-current" class="tape-current" x="0" y="4">0</text>
+          <!-- center reticle -->
+          <polygon fill="#22d3ee" points="-26,-12 -26,12 -32,0"/>
+        </svg>
+        <div class="readout">
+          <span class="dim">ALT</span> <span id="alt-val">0.0 m</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>GROUND SPEED</h3>
+        <svg viewBox="-30 -100 60 200" preserveAspectRatio="xMidYMid meet">
+          <rect class="tape-bg" x="-25" y="-90" width="50" height="180" rx="4"/>
+          <g id="spd-tape"></g>
+          <rect x="-26" y="-12" width="52" height="24" fill="#16223c" stroke="#22d3ee" stroke-width="1.5"/>
+          <text id="spd-tape-current" class="tape-current" x="0" y="4">0</text>
+          <polygon fill="#22d3ee" points="-26,-12 -26,12 -32,0"/>
+        </svg>
+        <div class="readout">
+          <span class="dim">SPD</span> <span id="spd-val">0.0 m/s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" id="row-sticks">
+      <div class="rc-housing">
+        <div class="gimbal-wrap">
+          <svg viewBox="-110 -110 220 220" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <radialGradient id="gimbal-grad" cx="0.5" cy="0.4" r="0.7">
+                <stop offset="0%" stop-color="#1a2b3f"/>
+                <stop offset="100%" stop-color="#0a131f"/>
+              </radialGradient>
+            </defs>
+            <circle cx="0" cy="0" r="100" fill="#0a131f" stroke="#0b1a26" stroke-width="3"/>
+            <circle cx="0" cy="0" r="92" fill="url(#gimbal-grad)" stroke="#0d2030" stroke-width="1"/>
+            <line x1="-78" y1="0" x2="78" y2="0" stroke="#3a4a60" stroke-width="1.5"/>
+            <line x1="0" y1="-78" x2="0" y2="78" stroke="#3a4a60" stroke-width="1.5"/>
+            <defs>
+              <radialGradient id="ball-grad" cx="0.35" cy="0.30" r="0.7">
+                <stop offset="0%" stop-color="#dfe6f0"/>
+                <stop offset="55%" stop-color="#9aa9bc"/>
+                <stop offset="100%" stop-color="#4c5a70"/>
+              </radialGradient>
+            </defs>
+            <circle id="stick-l-dot" cx="0" cy="0" r="15"
+                    fill="url(#ball-grad)" stroke="#1a2433" stroke-width="1.5"/>
+          </svg>
+          <div class="gimbal-label">THROTTLE · YAW</div>
+          <div class="gimbal-readout">
+            THR <span id="stick-l-thr">1500</span> &nbsp;·&nbsp; YAW <span id="stick-l-yaw">1500</span>
+          </div>
+        </div>
+        <div class="gimbal-wrap">
+          <svg viewBox="-110 -110 220 220" preserveAspectRatio="xMidYMid meet">
+            <circle cx="0" cy="0" r="100" fill="#0a131f" stroke="#0b1a26" stroke-width="3"/>
+            <circle cx="0" cy="0" r="92" fill="url(#gimbal-grad)" stroke="#0d2030" stroke-width="1"/>
+            <line x1="-78" y1="0" x2="78" y2="0" stroke="#3a4a60" stroke-width="1.5"/>
+            <line x1="0" y1="-78" x2="0" y2="78" stroke="#3a4a60" stroke-width="1.5"/>
+            <circle id="stick-r-dot" cx="0" cy="0" r="15"
+                    fill="url(#ball-grad)" stroke="#1a2433" stroke-width="1.5"/>
+          </svg>
+          <div class="gimbal-label">PITCH · ROLL</div>
+          <div class="gimbal-readout">
+            PIT <span id="stick-r-pit">1500</span> &nbsp;·&nbsp; ROLL <span id="stick-r-rol">1500</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="ctrl">
+      <button class="btn" id="btn-play">▶ PLAY</button>
+      <button class="btn alt" id="btn-pause">❚❚ PAUSE</button>
+      <button class="btn alt" id="btn-reset">⏮ RESET</button>
+      <div class="speed-group">
+        <button class="speed-btn" data-speed="0.5">0.5×</button>
+        <button class="speed-btn active" data-speed="1">1×</button>
+        <button class="speed-btn" data-speed="2">2×</button>
+        <button class="speed-btn" data-speed="4">4×</button>
+        <button class="speed-btn" data-speed="8">8×</button>
+      </div>
+      <input type="range" id="scrub" min="0" max="${D.n-1}" value="0">
+      <div id="time-readout"><span id="t-time">--:--:--</span> <span style="color:#8b97b3">·</span> <span id="t-rel">T+0.0s</span></div>
+    </div>
+  </div>`;
+
+  // Build pitch ladder
+  const ladder = document.getElementById('ai-pitch-ladder');
+  for (let p = -90; p <= 90; p += 10) {
+    if (p === 0) continue;
+    const y = p * 4;  // 4 px per degree (matches translate factor below)
+    const w = (Math.abs(p) % 30 === 0) ? 30 : 16;
+    ladder.innerHTML += `<line class="ai-pitch-tick" x1="-${w}" y1="${y}" x2="${w}" y2="${y}"/>`;
+    if (Math.abs(p) % 30 === 0) {
+      ladder.innerHTML += `<text class="ai-pitch-label" x="-${w+4}" y="${y+2}" text-anchor="end">${Math.abs(p)}</text>`;
+      ladder.innerHTML += `<text class="ai-pitch-label" x="${w+4}" y="${y+2}" text-anchor="start">${Math.abs(p)}</text>`;
+    }
+  }
+  // Roll scale ticks at top (every 30°)
+  const rollScale = document.getElementById('ai-roll-scale');
+  for (let r = -60; r <= 60; r += 10) {
+    const rad = (r - 90) * Math.PI / 180;
+    const r1 = 80, r2 = (r % 30 === 0) ? 70 : 75;
+    const x1 = r1 * Math.cos(rad), y1 = r1 * Math.sin(rad);
+    const x2 = r2 * Math.cos(rad), y2 = r2 * Math.sin(rad);
+    rollScale.innerHTML += `<line class="ai-roll-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  }
+
+  // Build compass rose (heading)
+  const rose = document.getElementById('hsi-rose');
+  const CARDINALS = {0:'N',90:'E',180:'S',270:'W'};
+  for (let h = 0; h < 360; h += 10) {
+    const rad = (h - 90) * Math.PI / 180;
+    const r1 = 80, r2 = (h % 30 === 0) ? 68 : 74;
+    const x1 = r1 * Math.cos(rad), y1 = r1 * Math.sin(rad);
+    const x2 = r2 * Math.cos(rad), y2 = r2 * Math.sin(rad);
+    rose.innerHTML += `<line class="hsi-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    if (h in CARDINALS) {
+      const lx = 56 * Math.cos(rad), ly = 56 * Math.sin(rad);
+      rose.innerHTML += `<text class="hsi-cardinal" x="${lx}" y="${ly+5}">${CARDINALS[h]}</text>`;
+    } else if (h % 30 === 0) {
+      const lx = 58 * Math.cos(rad), ly = 58 * Math.sin(rad);
+      rose.innerHTML += `<text class="hsi-deg" x="${lx}" y="${ly+3}">${h/10}</text>`;
+    }
+  }
+
+  // Build altitude tape (initial state — actual marks rendered each frame)
+  function buildTape(g, span, step) {
+    const out = [];
+    for (let k = -span; k <= span; k += step) {
+      const y = -k * (180 / (2 * span));  // map [-span, +span] → [+90, -90] (top = +span)
+      const major = (k % (step*5) === 0);
+      const w = major ? 12 : 6;
+      out.push(`<line class="${major?'tape-tick-major':'tape-tick'}" x1="-25" y1="${y}" x2="${-25+w}" y2="${y}"/>`);
+      if (major) out.push(`<text class="tape-label" x="${-25+w+3}" y="${y+3}">${k}</text>`);
+    }
+    g.innerHTML = out.join('');
+  }
+  buildTape(document.getElementById('alt-tape'), 50, 5);
+  buildTape(document.getElementById('spd-tape'), 20, 2);
+
+  // ---------- Animation ----------
+  let framePos = 0;       // fractional frame position (e.g. 12.37)
+  let playing = false;
+  let speed = 1.0;
+  let lastTime = 0;
+  // Real-time: at 1×, 1 wall-clock second of playback advances
+  // exactly the frames covered in the same real-time slice.
+  const flightDurationSec = Math.max(0.001, (D.trel[D.n - 1] - D.trel[0]));
+  const BASE_FPS = D.n / flightDurationSec;
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpAngle(a, b, t) {
+    let d = (b - a) % 360;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return ((a + d * t) % 360 + 360) % 360;
+  }
+
+  function update(fp) {
+    framePos = Math.max(0, Math.min(D.n-1, fp));
+    const lo = Math.floor(framePos);
+    const hi = Math.min(D.n-1, lo + 1);
+    const f = framePos - lo;
+    const r = lerp(D.roll[lo],  D.roll[hi],  f);
+    const p = lerp(D.pitch[lo], D.pitch[hi], f);
+    const y = lerpAngle(D.yaw[lo], D.yaw[hi], f);
+    const a = lerp(D.alt[lo],   D.alt[hi],   f);
+    const s = lerp(D.spd[lo],   D.spd[hi],   f);
+    const c1 = lerp(D.c1[lo], D.c1[hi], f);
+    const c2 = lerp(D.c2[lo], D.c2[hi], f);
+    const c3 = lerp(D.c3[lo], D.c3[hi], f);
+    const c4 = lerp(D.c4[lo], D.c4[hi], f);
+    const trel = lerp(D.trel[lo], D.trel[hi], f);
+    const tstr = D.tstr[lo] || '--:--:--';
+    const frame = lo;  // for raw value displays
+
+    // Attitude indicator
+    document.getElementById('ai-roll-group').setAttribute('transform', `rotate(${-r})`);
+    document.getElementById('ai-pitch-group').setAttribute('transform', `translate(0, ${p*4})`);
+    document.getElementById('ai-roll-val').textContent  = (r>=0?'+':'') + r.toFixed(1) + '°';
+    document.getElementById('ai-pitch-val').textContent = (p>=0?'+':'') + p.toFixed(1) + '°';
+
+    // Heading
+    const hdg = ((y % 360) + 360) % 360;
+    document.getElementById('hsi-rose').setAttribute('transform', `rotate(${-hdg})`);
+    document.getElementById('hsi-hdg-val').textContent = String(Math.round(hdg)).padStart(3,'0') + '°';
+
+    // Altitude tape — shift the tape so current altitude lines up with center
+    const altSpan = 50;
+    const altShift = a * (180 / (2 * altSpan));
+    document.getElementById('alt-tape').setAttribute('transform', `translate(0, ${altShift})`);
+    document.getElementById('alt-tape-current').textContent = a.toFixed(0);
+    document.getElementById('alt-val').textContent = a.toFixed(1) + ' m';
+
+    // Speed tape
+    const spdSpan = 20;
+    const spdShift = s * (180 / (2 * spdSpan));
+    document.getElementById('spd-tape').setAttribute('transform', `translate(0, ${spdShift})`);
+    document.getElementById('spd-tape-current').textContent = s.toFixed(0);
+    document.getElementById('spd-val').textContent = s.toFixed(1) + ' m/s';
+
+    // Sticks: PWM 1000-2000 → -1..+1, mapped inside gimbal (r=92, travel=75)
+    function norm(c) { return (c - 1500) / 500; }
+    const TRAVEL = 75;
+    const lx = norm(c4) * TRAVEL;   // yaw → x
+    const ly = -norm(c3) * TRAVEL;  // throttle → -y (up = high)
+    const rx = norm(c1) * TRAVEL;   // roll → x
+    const ry = -norm(c2) * TRAVEL;  // pitch → -y
+    document.getElementById('stick-l-dot').setAttribute('cx', lx);
+    document.getElementById('stick-l-dot').setAttribute('cy', ly);
+    document.getElementById('stick-r-dot').setAttribute('cx', rx);
+    document.getElementById('stick-r-dot').setAttribute('cy', ry);
+    document.getElementById('stick-l-thr').textContent = Math.round(c3);
+    document.getElementById('stick-l-yaw').textContent = Math.round(c4);
+    document.getElementById('stick-r-pit').textContent = Math.round(c2);
+    document.getElementById('stick-r-rol').textContent = Math.round(c1);
+
+    // Time readout
+    document.getElementById('t-time').textContent = tstr + ' TR';
+    document.getElementById('t-rel').textContent  = 'T+' + trel.toFixed(1) + 's';
+
+    // Sync scrub bar
+    document.getElementById('scrub').value = Math.round(framePos);
+  }
+
+  function loop(t) {
+    if (!playing) return;
+    if (lastTime === 0) { lastTime = t; requestAnimationFrame(loop); return; }
+    const dt = (t - lastTime) / 1000;
+    lastTime = t;
+    let next = framePos + dt * BASE_FPS * speed;
+    if (next >= D.n - 1) {
+      playing = false;
+      update(D.n - 1);
+      return;
+    }
+    update(next);
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('btn-play').addEventListener('click', () => {
+    if (playing) return;
+    if (framePos >= D.n - 1) framePos = 0;
+    playing = true; lastTime = 0;
+    requestAnimationFrame(loop);
+  });
+  document.getElementById('btn-pause').addEventListener('click', () => { playing = false; });
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    playing = false; update(0);
+  });
+  document.getElementById('scrub').addEventListener('input', (e) => {
+    playing = false;
+    update(parseInt(e.target.value, 10));
+  });
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      speed = parseFloat(btn.dataset.speed);
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  update(0);
+}
+</script>
+</body></html>
+"""
+
 PLOT3D_HTML_TEMPLATE = """<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8" />
 <title>3D Track</title>
 <style>
   html,body{height:100%;margin:0;padding:0;background:#0b1220;
-            font-family:"Segoe UI","Helvetica Neue",sans-serif;color:#e6edf7;overflow:hidden}
-  #plot{width:100%;height:100vh}
+            font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;color:#e6edf7;overflow:hidden}
+  #app{height:100vh;display:flex;flex-direction:column}
+  #plot{flex:1;min-height:0;width:100%}
+  #ctrl3d{display:flex;align-items:center;gap:14px;padding:10px 14px;
+          background:#111a2e;border-top:1px solid #243154;flex-shrink:0}
+  #ctrl3d .btn{background:#22d3ee;color:#0b1220;font-weight:800;letter-spacing:1.5px;
+       font-size:11px;padding:8px 16px;border-radius:6px;cursor:pointer;
+       border:1px solid #22d3ee;font-family:inherit;transition:all 0.15s;
+       box-shadow:0 0 12px rgba(34,211,238,0.35)}
+  #ctrl3d .btn:hover{background:#67e8f9;border-color:#67e8f9}
+  #ctrl3d .btn.alt{background:#16223c;color:#e6edf7;border-color:#243154;box-shadow:none}
+  #ctrl3d .btn.alt:hover{background:#1d2c4d;border-color:#22d3ee;color:#22d3ee}
+  #ctrl3d .speed-group{display:flex;gap:4px;padding:3px;background:#0b1220;
+               border:1px solid #243154;border-radius:6px}
+  #ctrl3d .speed-btn{background:transparent;color:#8b97b3;font-size:10px;font-weight:700;
+             letter-spacing:1px;padding:6px 10px;border:none;border-radius:4px;
+             cursor:pointer;font-family:"JetBrains Mono","SF Mono",Menlo,monospace}
+  #ctrl3d .speed-btn:hover{color:#22d3ee;background:#16223c}
+  #ctrl3d .speed-btn.active{background:#22d3ee;color:#0b1220}
+  #ctrl3d #scrub3d{flex:1;-webkit-appearance:none;height:6px;background:#243154;
+         border-radius:3px;outline:none;cursor:pointer}
+  #ctrl3d #scrub3d::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+         background:#22d3ee;border-radius:50%;border:2px solid #0b1220;cursor:pointer;
+         box-shadow:0 0 10px rgba(34,211,238,0.7)}
+  #t3d{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
+         color:#22d3ee;font-size:13px;font-weight:700;letter-spacing:1px;min-width:200px;text-align:right}
   .empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
          padding:18px 24px;background:#111a2e;border:1px solid #243154;
          color:#8b97b3;border-radius:8px;text-align:center}
@@ -314,13 +776,33 @@ PLOT3D_HTML_TEMPLATE = """<!DOCTYPE html>
 </style>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head><body>
-<div id="hud" class="hud" style="display:none">
-  <span>◈ TELEMETRY</span>
-  <span class="v" id="hud-alt">alt — m</span>
-  <span class="v" id="hud-d">dist — m</span>
-  <span class="v" id="hud-i">frame —/—</span>
+<div id="app">
+  <div style="position:relative;flex:1;min-height:0">
+    <div id="hud" class="hud" style="display:none">
+      <span>◈ TELEMETRY</span>
+      <span class="v" id="hud-time">time —</span>
+      <span class="v" id="hud-elapsed">T+ —s</span>
+      <span class="v" id="hud-alt">alt — m</span>
+      <span class="v" id="hud-d">dist — m</span>
+      <span class="v" id="hud-i">frame —/—</span>
+    </div>
+    <div id="plot" style="width:100%;height:100%"></div>
+  </div>
+  <div id="ctrl3d">
+    <button class="btn" id="btn-play3d">▶ PLAY</button>
+    <button class="btn alt" id="btn-pause3d">❚❚ PAUSE</button>
+    <button class="btn alt" id="btn-reset3d">⏮ RESET</button>
+    <div class="speed-group">
+      <button class="speed-btn" data-speed="0.5">0.5×</button>
+      <button class="speed-btn active" data-speed="1">1×</button>
+      <button class="speed-btn" data-speed="2">2×</button>
+      <button class="speed-btn" data-speed="4">4×</button>
+      <button class="speed-btn" data-speed="8">8×</button>
+    </div>
+    <input type="range" id="scrub3d" min="0" max="0" value="0" step="0.01">
+    <div id="t3d"><span id="t3d-time">--:--:--</span> <span style="color:#8b97b3">·</span> <span id="t3d-rel">T+0.0s</span></div>
+  </div>
 </div>
-<div id="plot"></div>
 <script>
 const PTS = __PTS__;
 if (!PTS || PTS.x.length < 2) {
@@ -329,110 +811,137 @@ if (!PTS || PTS.x.length < 2) {
     + '<div style="font-size:12px">Need at least 2 GPS/POS points with a 3D fix.</div></div>';
 } else {
   const X = PTS.x, Y = PTS.y, Z = PTS.z;
+  const TSTR = PTS.tstr || [];
+  const TREL = PTS.trel || [];
   const N = X.length;
-  // Subsample for animation frames (cap ~150 to stay smooth)
-  const FRAMES = Math.min(150, N);
+  const FRAMES = Math.min(400, N);
   const STEP = Math.max(1, Math.floor(N / FRAMES));
   const idxs = [];
   for (let i = 0; i < N; i += STEP) idxs.push(i);
   if (idxs[idxs.length-1] !== N - 1) idxs.push(N - 1);
 
-  // Cumulative distance for HUD
   const cumD = new Array(N).fill(0);
   for (let i = 1; i < N; i++) {
     const dx=X[i]-X[i-1], dy=Y[i]-Y[i-1], dz=Z[i]-Z[i-1];
     cumD[i] = cumD[i-1] + Math.sqrt(dx*dx+dy*dy+dz*dz);
   }
 
-  // Direction vector at index i (forward difference, normalized)
   function dir(i) {
-    const j = Math.min(i + 1, N - 1);
-    const k = Math.max(i - 1, 0);
+    // Look ahead a few samples for a stable direction estimate
+    const win = Math.max(1, Math.floor(N / 80));
+    const j = Math.min(i + win, N - 1);
+    const k = Math.max(i - win, 0);
     let u = X[j]-X[k], v = Y[j]-Y[k], w = Z[j]-Z[k];
-    const m = Math.sqrt(u*u+v*v+w*w) || 1;
+    const m = Math.sqrt(u*u+v*v+w*w);
+    if (m < 1e-6) return [0, 1, 0];  // default: nose forward (+y)
     return [u/m, v/m, w/m];
   }
 
   const xExtent = Math.max(...X) - Math.min(...X);
   const yExtent = Math.max(...Y) - Math.min(...Y);
   const zExtent = Math.max(...Z) - Math.min(...Z);
-  const sizeRef = Math.max(0.6, Math.max(xExtent, yExtent, zExtent) * 0.06);
+  const S = Math.max(0.8, Math.max(xExtent, yExtent, zExtent) * 0.04);
 
-  // ---- Initial traces ----
-  // 0: full route (dimmed)
+  // ---- Aircraft mesh — user-supplied (airplane_mesh.json) or procedural fallback ----
+  const MESH = __MESH__;
+  let BODY, FACE_I, FACE_J, FACE_K, VERT_COLORS;
+  if (MESH && MESH.verts && MESH.verts.length > 0) {
+    BODY = MESH.verts;          // body-frame coords, longest dim ~2.0
+    FACE_I = MESH.faces.map(f => f[0]);
+    FACE_J = MESH.faces.map(f => f[1]);
+    FACE_K = MESH.faces.map(f => f[2]);
+    VERT_COLORS = MESH.vcolors || [];
+  } else {
+    BODY = [
+      [ 0.9,  0.9,  0.0 ], [-0.9,  0.9,  0.0 ],
+      [ 0.9, -0.9,  0.0 ], [-0.9, -0.9,  0.0 ],
+      [ 0.0,  0.0,  0.35], [ 0.0,  0.0, -0.35],
+      [ 0.0,  1.1,  0.10],
+    ];
+    FACE_I = [4,4,4,4,4,5,5,5,5,5];
+    FACE_J = [0,6,1,3,2,6,1,3,2,0];
+    FACE_K = [6,1,3,2,0,0,6,1,3,2];
+    VERT_COLORS = ['#22d3ee','#22d3ee','#a78bfa','#a78bfa','#22d3ee','#a78bfa','#fbbf24'];
+  }
+
+  function rotatedAircraftVerts(i) {
+    const fwd = dir(i);
+    const upx=0, upy=0, upz=1;
+    // right = fwd × up
+    let rx = fwd[1]*upz - fwd[2]*upy;
+    let ry = fwd[2]*upx - fwd[0]*upz;
+    let rz = fwd[0]*upy - fwd[1]*upx;
+    let rm = Math.hypot(rx, ry, rz);
+    if (rm < 1e-6) { rx=1; ry=0; rz=0; rm=1; }
+    rx/=rm; ry/=rm; rz/=rm;
+    // up' = right × fwd
+    const u2x = ry*fwd[2] - rz*fwd[1];
+    const u2y = rz*fwd[0] - rx*fwd[2];
+    const u2z = rx*fwd[1] - ry*fwd[0];
+    const cx = X[i], cy = Y[i], cz = Z[i];
+    const N = BODY.length;
+    const xs = new Array(N), ys = new Array(N), zs = new Array(N);
+    for (let k = 0; k < N; k++) {
+      const v = BODY[k];
+      // Negate body-Y so the nose (was at -Y in the imported model) points forward.
+      const sx = v[0]*S, sy = -v[1]*S, sz = v[2]*S;
+      xs[k] = sx*rx + sy*fwd[0] + sz*u2x + cx;
+      ys[k] = sx*ry + sy*fwd[1] + sz*u2y + cy;
+      zs[k] = sx*rz + sy*fwd[2] + sz*u2z + cz;
+    }
+    return { x: xs, y: ys, z: zs };
+  }
+
+  // ---- Traces ----
   const fullRoute = {
     type:'scatter3d', mode:'lines',
     x:X, y:Y, z:Z,
     line:{ width:2, color:'rgba(167,139,250,0.30)' },
-    name:'route',
-    hoverinfo:'skip',
-    showlegend:true
+    name:'route', hoverinfo:'skip', showlegend:true
   };
-  // 1: flown trail (bright cyan, grows during animation)
   const flownTrail = {
     type:'scatter3d', mode:'lines',
     x:[X[0]], y:[Y[0]], z:[Z[0]],
     line:{ width:6, color:'#22d3ee' },
-    name:'flown',
-    hoverinfo:'skip'
+    name:'flown', hoverinfo:'skip'
   };
-  // 2: aircraft (cone, points along velocity)
-  const [u0,v0,w0] = dir(0);
+  const initVerts = rotatedAircraftVerts(0);
   const aircraft = {
-    type:'cone',
-    x:[X[0]], y:[Y[0]], z:[Z[0]],
-    u:[u0], v:[v0], w:[w0],
-    sizemode:'absolute', sizeref:sizeRef,
-    showscale:false,
-    colorscale:[[0,'#fbbf24'],[1,'#f87171']],
-    anchor:'tail',
+    type:'mesh3d',
+    x: initVerts.x, y: initVerts.y, z: initVerts.z,
+    i: FACE_I, j: FACE_J, k: FACE_K,
+    vertexcolor: VERT_COLORS,
+    flatshading: false,
+    lighting: { ambient:0.55, diffuse:0.7, specular:0.4, roughness:0.4 },
+    lightposition: { x:1000, y:1000, z:2000 },
     name:'aircraft',
     hovertemplate:'AIRCRAFT<br>x: %{x:.1f} m<br>y: %{y:.1f} m<br>alt: %{z:.1f} m<extra></extra>'
   };
-  // 3: start marker
   const startMarker = {
     type:'scatter3d', mode:'markers',
     x:[X[0]], y:[Y[0]], z:[Z[0]],
     marker:{ size:7, color:'#34d399', line:{color:'#0b1220',width:2} },
-    name:'start',
-    hovertemplate:'START<extra></extra>'
+    name:'start', hovertemplate:'START<extra></extra>'
   };
-  // 4: end marker
   const endMarker = {
     type:'scatter3d', mode:'markers',
     x:[X[N-1]], y:[Y[N-1]], z:[Z[N-1]],
     marker:{ size:7, color:'#f87171', line:{color:'#0b1220',width:2} },
-    name:'end',
-    hovertemplate:'END<extra></extra>'
+    name:'end', hovertemplate:'END<extra></extra>'
   };
 
-  // ---- Animation frames ----
-  const frames = idxs.map(i => {
-    const [u,v,w] = dir(i);
-    return {
-      name: String(i),
-      data: [
-        {},  // route unchanged
-        { x:X.slice(0,i+1), y:Y.slice(0,i+1), z:Z.slice(0,i+1) },  // flown
-        { x:[X[i]], y:[Y[i]], z:[Z[i]], u:[u], v:[v], w:[w] }       // aircraft
-      ],
-      traces:[0,1,2]
-    };
-  });
+  // Real-time playback: at 1×, one wall-clock second advances the same
+  // sample range covered by one real second of flight.
+  const flightDurationSec = Math.max(0.001, TREL[N-1] - TREL[0]);
+  const BASE_INDEX_PER_SEC = N / flightDurationSec;  // 1× = real time
 
-  const sliderSteps = idxs.map(i => ({
-    label:'',
-    method:'animate',
-    args:[[String(i)], { mode:'immediate',
-                         frame:{duration:0,redraw:true},
-                         transition:{duration:0} }]
-  }));
+  function lerp(a, b, t) { return a + (b - a) * t; }
 
   const layout = {
     paper_bgcolor:'#0b1220',
     plot_bgcolor:'#0b1220',
-    font:{ color:'#e6edf7', family:'"Segoe UI","Helvetica Neue",sans-serif' },
-    margin:{ l:0, r:0, t:0, b:90 },
+    font:{ color:'#e6edf7', family:'"Inter","Helvetica Neue","Segoe UI",sans-serif' },
+    margin:{ l:0, r:0, t:0, b:0 },
     showlegend:true,
     scene:{
       bgcolor:'#0b1220',
@@ -452,58 +961,144 @@ if (!PTS || PTS.x.length < 2) {
              bgcolor:'rgba(17,26,46,0.85)',
              bordercolor:'#22d3ee', borderwidth:1,
              x:0.85, y:0.97 },
-    updatemenus:[{
-      type:'buttons',
-      direction:'left',
-      x:0.02, y:0, xanchor:'left', yanchor:'bottom',
-      pad:{t:10, b:20, l:0, r:0},
-      bgcolor:'rgba(17,26,46,0.0)', bordercolor:'rgba(0,0,0,0)',
-      font:{color:'#e6edf7', family:'"Segoe UI",sans-serif', size:11},
-      buttons:[
-        { label:'▶  PLAY', method:'animate',
-          args:[null, { mode:'immediate', fromcurrent:true,
-                        frame:{duration:60, redraw:true},
-                        transition:{duration:0} }] },
-        { label:'❚❚  PAUSE', method:'animate',
-          args:[[null], { mode:'immediate',
-                          frame:{duration:0, redraw:false},
-                          transition:{duration:0} }] },
-        { label:'⏮  RESET', method:'animate',
-          args:[[String(idxs[0])], { mode:'immediate',
-                                      frame:{duration:0, redraw:true},
-                                      transition:{duration:0} }] }
-      ]
-    }],
-    sliders:[{
-      pad:{t:10, b:0, l:280, r:30},
-      x:0, y:0,
-      len:1,
-      bgcolor:'#243154',
-      bordercolor:'rgba(0,0,0,0)',
-      activebgcolor:'#22d3ee',
-      tickcolor:'#8b97b3',
-      font:{color:'#8b97b3', size:10},
-      currentvalue:{ visible:false },
-      steps:sliderSteps
-    }]
   };
   const config = { displayModeBar:true, displaylogo:false, responsive:true,
                    modeBarButtonsToRemove:['toImage'] };
 
   document.getElementById('hud').style.display = 'block';
-  function updateHud(i) {
-    document.getElementById('hud-alt').textContent = 'ALT ' + Z[i].toFixed(1) + ' m';
-    document.getElementById('hud-d').textContent   = 'DIST ' + cumD[i].toFixed(1) + ' m';
-    document.getElementById('hud-i').textContent   = 'FRAME ' + (idxs.indexOf(i)+1) + '/' + idxs.length;
+  function updateHud(fp) {
+    const lo = Math.floor(fp);
+    const hi = Math.min(N-1, lo + 1);
+    const f = fp - lo;
+    const t = TSTR[lo] || '—';
+    const tr = lerp(TREL[lo] || 0, TREL[hi] || 0, f);
+    const alt = lerp(Z[lo], Z[hi], f);
+    const dist = lerp(cumD[lo], cumD[hi], f);
+    document.getElementById('hud-time').textContent    = 'TIME ' + t + ' TR';
+    document.getElementById('hud-elapsed').textContent = 'T+' + tr.toFixed(1) + 's';
+    document.getElementById('hud-alt').textContent     = 'ALT ' + alt.toFixed(1) + ' m';
+    document.getElementById('hud-d').textContent       = 'DIST ' + dist.toFixed(1) + ' m';
+    document.getElementById('hud-i').textContent       = 'SAMPLE ' + (lo+1) + '/' + N;
+    document.getElementById('t3d-time').textContent    = t + ' TR';
+    document.getElementById('t3d-rel').textContent     = 'T+' + tr.toFixed(1) + 's';
   }
-  updateHud(0);
+
+  // Smooth interpolated direction vector at fractional sample position
+  function dirAt(fp) {
+    const lo = Math.floor(fp);
+    const hi = Math.min(N-1, lo + 1);
+    const t = fp - lo;
+    const dlo = dir(lo), dhi = dir(hi);
+    let u = lerp(dlo[0], dhi[0], t);
+    let v = lerp(dlo[1], dhi[1], t);
+    let w = lerp(dlo[2], dhi[2], t);
+    const m = Math.hypot(u, v, w);
+    if (m < 1e-6) return [0, 1, 0];
+    return [u/m, v/m, w/m];
+  }
+
+  // Interpolated rotated mesh at any fractional position
+  function rotatedAircraftVertsAt(fp) {
+    const lo = Math.floor(fp), hi = Math.min(N-1, lo + 1), t = fp - lo;
+    const cx = lerp(X[lo], X[hi], t);
+    const cy = lerp(Y[lo], Y[hi], t);
+    const cz = lerp(Z[lo], Z[hi], t);
+    const fwd = dirAt(fp);
+    const upx=0, upy=0, upz=1;
+    let rx = fwd[1]*upz - fwd[2]*upy;
+    let ry = fwd[2]*upx - fwd[0]*upz;
+    let rz = fwd[0]*upy - fwd[1]*upx;
+    let rm = Math.hypot(rx, ry, rz);
+    if (rm < 1e-6) { rx=1; ry=0; rz=0; rm=1; }
+    rx/=rm; ry/=rm; rz/=rm;
+    const u2x = ry*fwd[2] - rz*fwd[1];
+    const u2y = rz*fwd[0] - rx*fwd[2];
+    const u2z = rx*fwd[1] - ry*fwd[0];
+    const nv = BODY.length;
+    const xs = new Array(nv), ys = new Array(nv), zs = new Array(nv);
+    for (let k = 0; k < nv; k++) {
+      const v = BODY[k];
+      const sx = v[0]*S, sy = -v[1]*S, sz = v[2]*S;
+      xs[k] = sx*rx + sy*fwd[0] + sz*u2x + cx;
+      ys[k] = sx*ry + sy*fwd[1] + sz*u2y + cy;
+      zs[k] = sx*rz + sy*fwd[2] + sz*u2z + cz;
+    }
+    return { x: xs, y: ys, z: zs };
+  }
+
+  // Trail = all samples up to lo, plus interpolated tip
+  function trailAt(fp) {
+    const lo = Math.floor(fp), hi = Math.min(N-1, lo + 1), t = fp - lo;
+    const tx = X.slice(0, lo + 1); tx.push(lerp(X[lo], X[hi], t));
+    const ty = Y.slice(0, lo + 1); ty.push(lerp(Y[lo], Y[hi], t));
+    const tz = Z.slice(0, lo + 1); tz.push(lerp(Z[lo], Z[hi], t));
+    return { x: tx, y: ty, z: tz };
+  }
+
+  let pos = 0;             // fractional sample index [0..N-1]
+  let playing = false;
+  let speed = 1.0;
+  let lastT = 0;
+  let lastRender = 0;
+  const TARGET_FPS = 30;   // throttle Plotly.restyle to 30fps (smooth + fast)
+
+  function renderFrame(fp) {
+    pos = Math.max(0, Math.min(N - 1, fp));
+    const trail = trailAt(pos);
+    const verts = rotatedAircraftVertsAt(pos);
+    Plotly.restyle('plot', {
+      x: [trail.x, verts.x],
+      y: [trail.y, verts.y],
+      z: [trail.z, verts.z]
+    }, [1, 2]);
+    updateHud(pos);
+    document.getElementById('scrub3d').value = pos.toString();
+  }
+
+  function loop(t) {
+    if (!playing) return;
+    if (lastT === 0) { lastT = t; lastRender = t; requestAnimationFrame(loop); return; }
+    const dt = (t - lastT) / 1000;
+    lastT = t;
+    pos += dt * BASE_INDEX_PER_SEC * speed;
+    if (pos >= N - 1) {
+      pos = N - 1;
+      playing = false;
+      renderFrame(pos);
+      return;
+    }
+    if (t - lastRender >= 1000 / TARGET_FPS) {
+      lastRender = t;
+      renderFrame(pos);
+    }
+    requestAnimationFrame(loop);
+  }
 
   Plotly.newPlot('plot', [fullRoute, flownTrail, aircraft, startMarker, endMarker], layout, config)
     .then(gd => {
-      Plotly.addFrames('plot', frames);
-      gd.on('plotly_animatingframe', e => {
-        const i = parseInt(e.frame.name, 10);
-        if (!isNaN(i)) updateHud(i);
+      document.getElementById('scrub3d').max = (N - 1).toString();
+      renderFrame(0);
+
+      document.getElementById('btn-play3d').addEventListener('click', () => {
+        if (playing) return;
+        if (pos >= N - 1) pos = 0;
+        playing = true; lastT = 0;
+        requestAnimationFrame(loop);
+      });
+      document.getElementById('btn-pause3d').addEventListener('click', () => { playing = false; });
+      document.getElementById('btn-reset3d').addEventListener('click', () => {
+        playing = false; renderFrame(0);
+      });
+      document.getElementById('scrub3d').addEventListener('input', (e) => {
+        playing = false;
+        renderFrame(parseFloat(e.target.value));
+      });
+      document.querySelectorAll('#ctrl3d .speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          speed = parseFloat(btn.dataset.speed);
+          document.querySelectorAll('#ctrl3d .speed-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
       });
     });
 }
@@ -518,7 +1113,7 @@ MAP_HTML_TEMPLATE = """<!DOCTYPE html>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   html,body,#map{height:100%;margin:0;padding:0;background:#0b1220}
-  .leaflet-container{background:#0b1220 !important;font-family:-apple-system,sans-serif}
+  .leaflet-container{background:#0b1220 !important;font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif}
   .leaflet-control-attribution{background:rgba(17,26,46,.85) !important;color:#8b97b3 !important;border:none !important}
   .leaflet-control-attribution a{color:#22d3ee !important}
   .leaflet-bar{border:1px solid #243154 !important;background:#16223c !important}
@@ -534,7 +1129,7 @@ MAP_HTML_TEMPLATE = """<!DOCTYPE html>
   .empty-banner{
     position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     padding:18px 24px;background:#111a2e;border:1px solid #243154;
-    color:#8b97b3;border-radius:8px;font-family:-apple-system,sans-serif;
+    color:#8b97b3;border-radius:8px;font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;
     z-index:1000;text-align:center
   }
 </style>
@@ -1158,7 +1753,8 @@ class MainWindow(QtWidgets.QMainWindow):
         title_box.setSpacing(0)
         title = QtWidgets.QLabel("UAV LOG VIEWER")
         title.setStyleSheet(
-            f"color:{TEXT}; font-size:16px; font-weight:800; letter-spacing:3px;"
+            f"color:{TEXT}; font-size:18px; font-weight:900; letter-spacing:4px;"
+            f"font-family: 'Inter Display', 'Inter', 'Helvetica Neue', sans-serif;"
         )
         subtitle = QtWidgets.QLabel("◢  ARDUPILOT TELEMETRY ANALYZER")
         subtitle.setStyleSheet(
@@ -1189,14 +1785,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.header_summary.setStyleSheet(
             f"color:{TEXT_DIM}; font-size:11px; padding:8px 14px;"
             f"background:{BG_2}; border:1px solid {BORDER}; border-radius:8px;"
-            f"font-family:'SF Mono', Menlo, monospace;"
+            f"font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;"
         )
         h.addWidget(self.header_summary)
 
         # Prominent credit badge in the header
         credit_badge = QtWidgets.QLabel(
             f"<span style='color:{TEXT_DIM};font-size:10px;letter-spacing:2px;font-weight:600;'>CREATED BY</span>"
-            f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:16px;font-weight:800;letter-spacing:1.5px;'>JAVID</span>"
+            f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:18px;font-weight:900;letter-spacing:2px;"
+            f"font-family:Inter Display,Inter,Helvetica Neue,sans-serif;'>JAVID</span>"
         )
         credit_badge.setTextFormat(Qt.TextFormat.RichText)
         credit_badge.setStyleSheet(
@@ -1242,7 +1839,7 @@ class MainWindow(QtWidgets.QMainWindow):
         lv.addWidget(sidebar_label)
 
         self.search = QtWidgets.QLineEdit()
-        self.search.setPlaceholderText("🔍  Filter messages or fields…")
+        self.search.setPlaceholderText("Filter messages or fields…")
         self.search.textChanged.connect(self._apply_filter)
         lv.addWidget(self.search)
 
@@ -1287,7 +1884,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cursor_label.setStyleSheet(
             f"color:{TEXT_DIM}; padding:6px 10px; background:{BG_2};"
             f"border:1px solid {BORDER}; border-radius:6px;"
-            f"font-family: Menlo, Monaco, Consolas, monospace; font-size:11px;"
+            f"font-family: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace; font-size:11px;"
         )
         self.plot = CrosshairPlot(self.cursor_label)
         self.plot.addLegend(
@@ -1304,19 +1901,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot.setLabel("bottom", "Time (Istanbul, UTC+3)", color=TEXT_DIM)
         pv.addWidget(self.plot, 1)
         pv.addWidget(self.cursor_label)
-        self.tabs.addTab(plot_container, "  📈  Plot  ")
+        self.tabs.addTab(plot_container, "  PLOT  ")
 
         # Map tab
         self.map_view = QWebEngineView()
         self.map_view.loadFinished.connect(self._on_map_loaded)
         self._set_map_coords([])
-        self.tabs.addTab(self.map_view, "  🗺  Map  ")
+        self.tabs.addTab(self.map_view, "  MAP  ")
 
         # 3D tab (Plotly via WebEngine — same tech as the map, no GL conflict)
         self.view3d = QWebEngineView()
         self.view3d.loadFinished.connect(self._on_3d_loaded)
         self._set_3d_points(None)
-        self.tabs.addTab(self.view3d, "  ◧  3D  ")
+        self.tabs.addTab(self.view3d, "  3D  ")
+
+        # Instruments tab (cockpit: attitude, heading, altitude, sticks)
+        self.instruments_view = QWebEngineView()
+        self.instruments_view.loadFinished.connect(self._on_instruments_loaded)
+        self._set_instruments(None)
+        self.tabs.addTab(self.instruments_view, "  COCKPIT  ")
 
         # Auto Review tab
         review_container = QtWidgets.QScrollArea()
@@ -1329,12 +1932,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.review_layout.setSpacing(12)
         self._review_placeholder()
         review_container.setWidget(self.review_inner)
-        self.tabs.addTab(review_container, "  ✓  Auto Review  ")
+        self.tabs.addTab(review_container, "  REVIEW  ")
 
         # Info tab
         self.info_text = QtWidgets.QPlainTextEdit()
         self.info_text.setReadOnly(True)
-        self.tabs.addTab(self.info_text, "  ⓘ  Info  ")
+        self.tabs.addTab(self.info_text, "  INFO  ")
 
         rv.addWidget(self.tabs)
         splitter.addWidget(right)
@@ -1401,6 +2004,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_info()
         self._populate_map()
         self._populate_3d()
+        self._populate_instruments()
         self._populate_review()
 
     # ----- Tree -----
@@ -1731,6 +2335,7 @@ class MainWindow(QtWidgets.QMainWindow):
             lats = np.asarray(block["Lat"], dtype=float)
             lngs = np.asarray(block["Lng"], dtype=float)
             alts = np.asarray(block.get("Alt", np.zeros_like(lats)), dtype=float)
+            ts = np.asarray(self.parsed["times"].get(mt, []), dtype=float)
             if np.nanmax(np.abs(lats)) > 200:
                 lats = lats / 1e7; lngs = lngs / 1e7
             mask = (np.abs(lats) > 0.0001) & (np.abs(lngs) > 0.0001)
@@ -1740,42 +2345,135 @@ class MainWindow(QtWidgets.QMainWindow):
                 if "NSats" in block:
                     mask &= np.asarray(block["NSats"], dtype=float) >= 4
             lats = lats[mask]; lngs = lngs[mask]; alts = alts[mask]
+            if len(ts) == len(mask):
+                ts = ts[mask]
+            else:
+                ts = np.zeros_like(lats)
             if len(lats) >= 2:
-                coords = (lats, lngs, alts)
+                coords = (lats, lngs, alts, ts)
                 break
 
         if coords is None:
             self._set_3d_points(None)
             return
 
-        lats, lngs, alts = coords
+        lats, lngs, alts, ts = coords
         lat0, lng0 = float(lats[0]), float(lngs[0])
         alt0 = float(alts[0])
-        # Flat-earth conversion to local meters (fine for short flights)
         m_per_deg_lat = 111320.0
         m_per_deg_lng = 111320.0 * np.cos(np.radians(lat0))
         x = (lngs - lng0) * m_per_deg_lng     # East
         y = (lats - lat0) * m_per_deg_lat     # North
         z = alts - alt0                        # Altitude AGL
 
-        # Downsample to keep Plotly snappy
         if len(x) > 4000:
             step = len(x) // 4000
-            x = x[::step]; y = y[::step]; z = z[::step]
+            x = x[::step]; y = y[::step]; z = z[::step]; ts = ts[::step]
+
+        # Pre-format Istanbul wall-clock strings for each sample
+        time_strs = [fmt_istanbul(float(t)) if t > 0 else "" for t in ts]
+        t_rel = [float(t - ts[0]) if t > 0 else 0.0 for t in ts]
 
         self._set_3d_points({
             "x": [float(v) for v in x],
             "y": [float(v) for v in y],
             "z": [float(v) for v in z],
+            "tstr": time_strs,
+            "trel": t_rel,
         })
 
     def _set_3d_points(self, pts):
         html = PLOT3D_HTML_TEMPLATE.replace("__PTS__", json.dumps(pts) if pts else "null")
+        # Load airplane mesh (or fall back to "null" so JS uses a procedural shape)
+        mesh_path = Path(__file__).parent / "airplane_mesh.json"
+        if mesh_path.exists():
+            with open(mesh_path, "r") as f:
+                html = html.replace("__MESH__", f.read())
+        else:
+            html = html.replace("__MESH__", "null")
         self.view3d.setHtml(html, QtCore.QUrl("https://localhost/"))
 
     def _on_3d_loaded(self, ok: bool):
         if not ok:
             self.statusBar().showMessage("3D view failed to load.")
+
+    # ----- Instruments tab -----
+    def _populate_instruments(self):
+        if self.parsed is None:
+            self._set_instruments(None)
+            return
+        d = self.parsed["data"]
+        t = self.parsed["times"]
+        t_start = self.parsed.get("t_start") or 0.0
+        t_end = self.parsed.get("t_end") or 0.0
+        if t_end <= t_start:
+            self._set_instruments(None)
+            return
+
+        # Dense timeline — 800 samples across the flight so interpolation has
+        # plenty of waypoints (avoids the "teleport between frames" effect).
+        N = 800
+        timeline = np.linspace(t_start, t_end, N)
+
+        def sample(mt, field, default=0.0):
+            block = d.get(mt)
+            times = t.get(mt)
+            if not block or field not in block or times is None or len(times) == 0:
+                return [default] * N
+            ts = np.asarray(times, dtype=float)
+            vs = np.asarray(block[field], dtype=float)
+            order = np.argsort(ts)
+            ts = ts[order]; vs = vs[order]
+            return np.interp(timeline, ts, vs).tolist()
+
+        # Attitude
+        roll  = sample("ATT", "Roll", 0.0)
+        pitch = sample("ATT", "Pitch", 0.0)
+        yaw   = sample("ATT", "Yaw", 0.0)
+
+        # Altitude — prefer BARO.Alt, fall back to POS.Alt
+        if "BARO" in d and "Alt" in d["BARO"]:
+            alt = sample("BARO", "Alt", 0.0)
+        else:
+            alt = sample("POS", "Alt", 0.0)
+        # Make altitude relative to first sample
+        if alt and alt[0] is not None:
+            a0 = alt[0]
+            alt = [a - a0 for a in alt]
+
+        # Ground speed
+        if "GPS" in d and "Spd" in d["GPS"]:
+            spd = sample("GPS", "Spd", 0.0)
+        else:
+            spd = [0.0] * N
+
+        # RC sticks (Mode 2 convention: C1=roll, C2=pitch, C3=throttle, C4=yaw)
+        c1 = sample("RCIN", "C1", 1500.0)
+        c2 = sample("RCIN", "C2", 1500.0)
+        c3 = sample("RCIN", "C3", 1500.0)
+        c4 = sample("RCIN", "C4", 1500.0)
+
+        # Format Istanbul time strings + relative seconds
+        tstr = [fmt_istanbul(float(ts_)) for ts_ in timeline]
+        trel = [float(ts_ - t_start) for ts_ in timeline]
+
+        self._set_instruments({
+            "n": N,
+            "roll": roll, "pitch": pitch, "yaw": yaw,
+            "alt": alt, "spd": spd,
+            "c1": c1, "c2": c2, "c3": c3, "c4": c4,
+            "tstr": tstr, "trel": trel,
+        })
+
+    def _set_instruments(self, data):
+        html = INSTRUMENTS_HTML_TEMPLATE.replace(
+            "__DATA__", json.dumps(data) if data else "null"
+        )
+        self.instruments_view.setHtml(html, QtCore.QUrl("https://localhost/"))
+
+    def _on_instruments_loaded(self, ok: bool):
+        if not ok:
+            self.statusBar().showMessage("Instruments view failed to load.")
 
     # ----- Map tab -----
     def _populate_map(self):
