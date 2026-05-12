@@ -2,7 +2,7 @@
 
 # About Me
 Hey there, thank you for checking out my ArduPilot UAV Log Viewer!
-My name is Javid I'm 21, I'm an astronautics engineer and I'm highly interested in UAV engineering, I built my first UAV a year ago and then I decided to create this program. 
+My name is Javid I'm 21, I'm an astronautics engineer and I'm highly interested in UAV, I built my first UAV a year ago and then I decided to create this program. 
 
 # ArduPilot UAV Log Viewer
 
