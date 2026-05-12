@@ -10,18 +10,58 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ----------------------------------------------------------------------------
-# Configuration — edit these to adapt the app to your locale.
+# Configuration — runtime-configurable via Preferences dialog.
 # ----------------------------------------------------------------------------
-# Default display timezone for log timestamps. Turkey/Istanbul is UTC+3.
-# To use a different timezone, change the offset:
-#   timezone(timedelta(hours=0))   # UTC
-#   timezone(timedelta(hours=-5))  # New York (EST, no DST handling)
-#   timezone(timedelta(hours=2))   # Berlin (CET, no DST handling)
-# For DST-aware zones, use ZoneInfo:
-#   from zoneinfo import ZoneInfo
-#   ISTANBUL_TZ = ZoneInfo("America/New_York")
-ISTANBUL_TZ = timezone(timedelta(hours=3), name="Istanbul")
-# ----------------------------------------------------------------------------
+try:
+    from zoneinfo import ZoneInfo
+    _HAVE_ZONEINFO = True
+except ImportError:
+    _HAVE_ZONEINFO = False
+
+# Default zone: Istanbul (UTC+3, no DST)
+ISTANBUL_TZ = (ZoneInfo("Europe/Istanbul") if _HAVE_ZONEINFO
+               else timezone(timedelta(hours=3), name="Istanbul"))
+TZ_NAME = "Europe/Istanbul"
+TZ_LABEL = "TR"
+
+# Pretty list of common timezones for the Settings dialog
+COMMON_TIMEZONES = [
+    ("Europe/Istanbul",      "TR",  "Türkiye (Istanbul)"),
+    ("UTC",                  "UTC", "Coordinated Universal Time"),
+    ("Europe/London",        "GB",  "United Kingdom (London)"),
+    ("Europe/Berlin",        "CE",  "Central Europe (Berlin, Paris)"),
+    ("Europe/Moscow",        "MSK", "Russia (Moscow)"),
+    ("America/New_York",     "ET",  "US Eastern (New York)"),
+    ("America/Chicago",      "CT",  "US Central (Chicago)"),
+    ("America/Denver",       "MT",  "US Mountain (Denver)"),
+    ("America/Los_Angeles",  "PT",  "US Pacific (Los Angeles)"),
+    ("Asia/Dubai",           "GST", "UAE (Dubai)"),
+    ("Asia/Kolkata",         "IST", "India (Delhi, Mumbai)"),
+    ("Asia/Bangkok",         "ICT", "Indochina (Bangkok)"),
+    ("Asia/Singapore",       "SGT", "Singapore, Malaysia"),
+    ("Asia/Tokyo",           "JST", "Japan (Tokyo)"),
+    ("Asia/Shanghai",        "CST", "China (Beijing, Shanghai)"),
+    ("Australia/Sydney",     "AEST","Sydney"),
+    ("Pacific/Auckland",     "NZ",  "New Zealand (Auckland)"),
+]
+
+def _apply_timezone(zone_name: str) -> None:
+    """Switch the global display timezone. Called at startup and from settings."""
+    global ISTANBUL_TZ, TZ_NAME, TZ_LABEL
+    label = next((lab for z, lab, _ in COMMON_TIMEZONES if z == zone_name), zone_name)
+    try:
+        if _HAVE_ZONEINFO:
+            ISTANBUL_TZ = ZoneInfo(zone_name)
+        else:
+            ISTANBUL_TZ = timezone(timedelta(hours=0), name=zone_name)
+        TZ_NAME = zone_name
+        TZ_LABEL = label
+    except Exception:
+        # Bad zone name — fall back to Istanbul
+        ISTANBUL_TZ = (ZoneInfo("Europe/Istanbul") if _HAVE_ZONEINFO
+                       else timezone(timedelta(hours=3), name="Istanbul"))
+        TZ_NAME = "Europe/Istanbul"
+        TZ_LABEL = "TR"
 
 def fmt_istanbul(unix_ts: float, with_date: bool = False) -> str:
     if unix_ts is None or unix_ts != unix_ts:  # None or NaN
@@ -700,7 +740,7 @@ if (!D) {
     document.getElementById('stick-r-rol').textContent = Math.round(c1);
 
     // Time readout
-    document.getElementById('t-time').textContent = tstr + ' TR';
+    document.getElementById('t-time').textContent = tstr + ' __TZLABEL__';
     document.getElementById('t-rel').textContent  = 'T+' + trel.toFixed(1) + 's';
 
     // Sync scrub bar
@@ -925,12 +965,44 @@ if (!PTS || PTS.x.length < 2) {
     return { x: xs, y: ys, z: zs };
   }
 
+  // ---- Distance markers along the route ----
+  // Adaptive spacing: ~6-10 markers depending on total distance flown
+  const totalDist = cumD[N-1] || 0;
+  let markerStep = 50;
+  if (totalDist >  500) markerStep = 100;
+  if (totalDist > 2000) markerStep = 250;
+  if (totalDist > 5000) markerStep = 500;
+  if (totalDist <  20) markerStep = 2;  // very short flight
+  else if (totalDist < 50) markerStep = 5;
+  else if (totalDist < 150) markerStep = 20;
+  const markerX = [], markerY = [], markerZ = [], markerLabels = [];
+  let nextMark = markerStep;
+  for (let i = 1; i < N; i++) {
+    if (cumD[i] >= nextMark) {
+      markerX.push(X[i]); markerY.push(Y[i]); markerZ.push(Z[i]);
+      markerLabels.push(nextMark + ' m');
+      nextMark += markerStep;
+    }
+  }
+
   // ---- Traces ----
   const fullRoute = {
     type:'scatter3d', mode:'lines',
     x:X, y:Y, z:Z,
     line:{ width:2, color:'rgba(167,139,250,0.30)' },
     name:'route', hoverinfo:'skip', showlegend:true
+  };
+  const distMarkers = {
+    type:'scatter3d', mode:'markers+text',
+    x: markerX, y: markerY, z: markerZ,
+    text: markerLabels,
+    textposition: 'top center',
+    textfont: { color:'#8b97b3', size:10,
+                family:'"JetBrains Mono","SF Mono",Menlo,monospace' },
+    marker: { size:4, color:'#a78bfa', symbol:'diamond',
+              line:{color:'#0b1220', width:1} },
+    name: 'distance',
+    hoverinfo: 'text'
   };
   const flownTrail = {
     type:'scatter3d', mode:'lines',
@@ -1007,12 +1079,12 @@ if (!PTS || PTS.x.length < 2) {
     const tr = lerp(TREL[lo] || 0, TREL[hi] || 0, f);
     const alt = lerp(Z[lo], Z[hi], f);
     const dist = lerp(cumD[lo], cumD[hi], f);
-    document.getElementById('hud-time').textContent    = 'TIME ' + t + ' TR';
+    document.getElementById('hud-time').textContent    = 'TIME ' + t + ' __TZLABEL__';
     document.getElementById('hud-elapsed').textContent = 'T+' + tr.toFixed(1) + 's';
     document.getElementById('hud-alt').textContent     = 'ALT ' + alt.toFixed(1) + ' m';
     document.getElementById('hud-d').textContent       = 'DIST ' + dist.toFixed(1) + ' m';
     document.getElementById('hud-i').textContent       = 'SAMPLE ' + (lo+1) + '/' + N;
-    document.getElementById('t3d-time').textContent    = t + ' TR';
+    document.getElementById('t3d-time').textContent    = t + ' __TZLABEL__';
     document.getElementById('t3d-rel').textContent     = 'T+' + tr.toFixed(1) + 's';
   }
 
@@ -1107,7 +1179,7 @@ if (!PTS || PTS.x.length < 2) {
     requestAnimationFrame(loop);
   }
 
-  Plotly.newPlot('plot', [fullRoute, flownTrail, aircraft, startMarker, endMarker], layout, config)
+  Plotly.newPlot('plot', [fullRoute, flownTrail, aircraft, startMarker, endMarker, distMarkers], layout, config)
     .then(gd => {
       document.getElementById('scrub3d').max = (N - 1).toString();
       renderFrame(0);
@@ -1336,10 +1408,77 @@ def auto_review(parsed: dict) -> list[dict]:
     data = parsed["data"]
     items: list[dict] = []
 
+    # Hover tooltips for each category — plain-English explanations
+    TIPS = {
+        "Vibration":
+            "ArduPilot's VIBE message records 3-axis acceleration variance "
+            "from the IMU. Under 30 m/s² is fine, over 60 m/s² degrades EKF "
+            "and position hold. Fixes: balance props, clean motor mounts, "
+            "soft-mount the flight controller.",
+        "IMU clipping":
+            "Counter that increments whenever the accelerometer hits its "
+            "measurement range limit (saturates). Any clipping at all means "
+            "vibration spikes — usually unbalanced props.",
+        "GPS":
+            "Quality of the GPS fix during the flight. HDop is the geometric "
+            "dilution of precision (lower = better, <1.5 excellent). For "
+            "Loiter/Auto/RTL you want HDop <1.5 and ≥8 satellites.",
+        "Battery":
+            "LiPo cells should stay above 3.5V each under load and never "
+            "drop below 3.3V. Below that you damage the cells and risk "
+            "venting/swelling. Land sooner or use a bigger pack.",
+        "Compass":
+            "Magnetic-field magnitude variance. Steady = good. >15% swing "
+            "usually means a power cable is too close to the compass — "
+            "redirect wiring or run Compass-Motor calibration.",
+        "EKF (state estimator)":
+            "ArduPilot's Extended Kalman Filter fuses IMU+GPS+compass+baro. "
+            "Innovation = how much the next measurement disagreed with the "
+            "filter's prediction. Spikes above 1.0 indicate the filter is "
+            "struggling (bad GPS, magnetic interference, or vibration).",
+        "Errors":
+            "ERR messages logged by ArduPilot subsystems. Each one corresponds "
+            "to a specific failure (sensor failure, RC loss, EKF failsafe, "
+            "geofence breach, etc.). Look up Subsys/ECode pairs in the "
+            "ArduPilot wiki for details.",
+        "Altitude":
+            "AGL (above takeoff) altitude profile. Vertical speed peaks "
+            "above 8 m/s indicate aggressive throttle inputs.",
+        "Attitude":
+            "Peak roll/pitch angles. Under 25° = calm, 25-45° = sport, "
+            ">45° = acro. Above 60° the drone loses altitude rapidly.",
+        "Motor balance":
+            "PWM output across motors. Should be within ~60 µs of each "
+            "other. Large spreads point to CG offset, bent arm, prop "
+            "imbalance, or one worn-out motor.",
+        "Power used":
+            "Total milliamp-hours drawn during the flight. Try to land "
+            "before 80% of pack capacity is used.",
+        "RC link":
+            "Stability of the RC receiver signal. Brief dropouts at long "
+            "range are normal; sustained drops mean RF interference or a "
+            "weak link — check antennas.",
+        "Autopilot CPU":
+            "Maximum 'main loop' execution time. The autopilot runs at "
+            "400 Hz (2500 µs budget). Overruns mean the FC is missing "
+            "real-time deadlines — reduce logging, disable unused features.",
+        "IMU temperature":
+            "Temperature drift across the flight. Big swings shift gyro "
+            "bias, which the EKF has to compensate for. IMU heaters or "
+            "letting the FC warm up before arming help.",
+        "Flight modes":
+            "Sequence of flight modes used. ArduCopter modes: 0=Stabilize, "
+            "5=Loiter, 6=RTL, 9=Land, etc.",
+        "Incidents detected":
+            "Notable events the auto-analyzer flagged from the data: ERR "
+            "codes, extreme attitudes, rapid altitude loss, EKF stress, RC "
+            "failsafes, and low-battery alerts.",
+    }
     def add(category, verdict, color, headline, detail):
         items.append({
             "category": category, "verdict": verdict, "color": color,
             "headline": headline, "detail": detail,
+            "tip": TIPS.get(category, ""),
         })
 
     # ---------- Vibration ----------
@@ -1970,8 +2109,69 @@ class CrosshairPlot(pg.PlotWidget):
         self.vline.show()
         # x is relative seconds — add t_start for wall-clock display
         self.status_label.setText(
-            f"◇   {fmt_istanbul(x + self._t_start, with_date=False)}  TR     y = {y:0.4f}"
+            f"◇   {fmt_istanbul(x + self._t_start, with_date=False)}  {TZ_LABEL}     y = {y:0.4f}"
         )
+
+
+class PreferencesDialog(QtWidgets.QDialog):
+    """Settings panel — currently a timezone picker."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Preferences")
+        self.setMinimumWidth(420)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
+
+        title = QtWidgets.QLabel("PREFERENCES")
+        title.setStyleSheet(
+            f"color:{TEXT}; font-size:13px; font-weight:700; letter-spacing:3px;"
+        )
+        layout.addWidget(title)
+
+        tz_label = QtWidgets.QLabel("DISPLAY TIMEZONE")
+        tz_label.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:2px;"
+        )
+        layout.addWidget(tz_label)
+
+        self.tz_combo = QtWidgets.QComboBox()
+        for zone, label, desc in COMMON_TIMEZONES:
+            self.tz_combo.addItem(f"{label}  ·  {desc}", userData=zone)
+        # Pre-select the current one
+        for i in range(self.tz_combo.count()):
+            if self.tz_combo.itemData(i) == TZ_NAME:
+                self.tz_combo.setCurrentIndex(i)
+                break
+        layout.addWidget(self.tz_combo)
+
+        help_txt = QtWidgets.QLabel(
+            "All timestamps shown in the app (plot axis, cockpit HUD, status bar, "
+            "Info tab, etc.) will use this zone. Changes take effect immediately."
+        )
+        help_txt.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px;")
+        help_txt.setWordWrap(True)
+        layout.addWidget(help_txt)
+
+        layout.addStretch(1)
+
+        # Buttons
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch(1)
+        cancel = QtWidgets.QPushButton("Cancel")
+        cancel.clicked.connect(self.reject)
+        btn_row.addWidget(cancel)
+        ok = QtWidgets.QPushButton("Apply")
+        ok.setObjectName("primary")
+        ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        ok.clicked.connect(self.accept)
+        ok.setDefault(True)
+        btn_row.addWidget(ok)
+        layout.addLayout(btn_row)
+
+    def selected_timezone(self) -> str:
+        return self.tz_combo.currentData()
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -1984,6 +2184,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.curves: dict[tuple[str, str], pg.PlotDataItem] = {}
         self.color_idx = 0
         self.worker: LogParseWorker | None = None
+        self.config: dict = self._load_config()
+        # Apply saved timezone (if any) before building UI
+        tz_name = self.config.get("timezone")
+        if tz_name:
+            _apply_timezone(tz_name)
         self.recent_files: list[str] = self._load_recent_files()
         self.comparison: dict | None = None
         self.comparison_curves: dict[tuple[str, str], pg.PlotDataItem] = {}
@@ -1993,6 +2198,53 @@ class MainWindow(QtWidgets.QMainWindow):
         self._build_ui()
         # Drag-and-drop a .bin/.tlog/.log onto the window to open it
         self.setAcceptDrops(True)
+        # Restore window position/size/splitter/tab from the previous session
+        self._restore_window_state()
+
+    # ----- Window state persistence -----
+    def _restore_window_state(self):
+        geo = self.config.get("window_geometry")
+        if isinstance(geo, str):
+            try:
+                self.restoreGeometry(QtCore.QByteArray.fromHex(geo.encode("ascii")))
+            except Exception:
+                pass
+        sizes = self.config.get("splitter_sizes")
+        if isinstance(sizes, list) and len(sizes) == 2:
+            try:
+                self.splitter.setSizes([int(x) for x in sizes])
+            except Exception:
+                pass
+        tab_idx = self.config.get("last_tab")
+        if isinstance(tab_idx, int) and 0 <= tab_idx < self.tabs.count():
+            self.tabs.setCurrentIndex(tab_idx)
+
+    # ----- Preferences -----
+    def open_preferences(self):
+        dlg = PreferencesDialog(self)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            new_zone = dlg.selected_timezone()
+            if new_zone and new_zone != TZ_NAME:
+                _apply_timezone(new_zone)
+                self.config["timezone"] = new_zone
+                self._save_config()
+                # Re-render everything that has time-formatted strings baked in
+                if self.parsed is not None:
+                    self._on_parsed(self.parsed)
+                self.statusBar().showMessage(
+                    f"Timezone changed to {new_zone} ({TZ_LABEL})."
+                )
+
+    def closeEvent(self, e):
+        try:
+            self.config["window_geometry"] = bytes(self.saveGeometry().toHex()).decode("ascii")
+            self.config["splitter_sizes"] = self.splitter.sizes()
+            self.config["last_tab"] = self.tabs.currentIndex()
+            self.config["timezone"] = TZ_NAME
+            self._save_config()
+        except Exception:
+            pass
+        super().closeEvent(e)
 
     # ----- Drag and drop -----
     @staticmethod
@@ -2072,28 +2324,48 @@ class MainWindow(QtWidgets.QMainWindow):
         clear_act.triggered.connect(self.clear_plot)
         view_menu.addAction(clear_act)
 
-    # ----- Recent files -----
-    @staticmethod
-    def _recent_files_path() -> Path:
-        return Path.home() / ".uav_log_viewer_recent.json"
+        view_menu.addSeparator()
+        prefs_act = QtGui.QAction("&Preferences…", self)
+        prefs_act.setShortcut("Ctrl+,")
+        prefs_act.triggered.connect(self.open_preferences)
+        view_menu.addAction(prefs_act)
 
-    def _load_recent_files(self) -> list[str]:
-        p = self._recent_files_path()
+    # ----- Persistent config (recent files, window state, timezone) -----
+    @staticmethod
+    def _config_path() -> Path:
+        return Path.home() / ".uav_log_viewer.json"
+
+    def _load_config(self) -> dict:
+        # Migrate old recent-only file if present and the new config isn't there yet
+        p = self._config_path()
         if not p.exists():
-            return []
+            old = Path.home() / ".uav_log_viewer_recent.json"
+            if old.exists():
+                try:
+                    with open(old) as f:
+                        data = json.load(f)
+                    if isinstance(data, list):
+                        return {"recent": [str(x) for x in data]}
+                except Exception:
+                    pass
+            return {}
         try:
             with open(p) as f:
-                data = json.load(f)
-            return [str(x) for x in data if isinstance(x, str) and Path(x).exists()][:10]
+                d = json.load(f)
+            return d if isinstance(d, dict) else {}
         except Exception:
-            return []
+            return {}
 
-    def _save_recent_files(self):
+    def _save_config(self):
         try:
-            with open(self._recent_files_path(), "w") as f:
-                json.dump(self.recent_files, f)
+            with open(self._config_path(), "w") as f:
+                json.dump(self.config, f, indent=2)
         except Exception:
             pass
+
+    def _load_recent_files(self) -> list[str]:
+        items = self.config.get("recent", [])
+        return [str(x) for x in items if isinstance(x, str) and Path(x).exists()][:10]
 
     def _push_recent(self, path: str):
         p = str(Path(path).resolve())
@@ -2101,7 +2373,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.recent_files.remove(p)
         self.recent_files.insert(0, p)
         self.recent_files = self.recent_files[:10]
-        self._save_recent_files()
+        self.config["recent"] = self.recent_files
+        self._save_config()
         self._rebuild_recent_menu()
 
     def _rebuild_recent_menu(self):
@@ -2351,8 +2624,8 @@ class MainWindow(QtWidgets.QMainWindow):
         rows.append("<h2>SUMMARY</h2>")
         rows.append("<table class='meta'>"
                     f"<tr><td>FILE</td><td>{name}</td></tr>"
-                    f"<tr><td>START (TR)</td><td>{start}</td></tr>"
-                    f"<tr><td>END (TR)</td><td>{end}</td></tr>"
+                    f"<tr><td>START ({TZ_LABEL})</td><td>{start}</td></tr>"
+                    f"<tr><td>END ({TZ_LABEL})</td><td>{end}</td></tr>"
                     f"<tr><td>DURATION</td><td>{dur:0.1f} s ({dur/60:0.2f} min)</td></tr>"
                     f"<tr><td>MESSAGES</td><td>{d.get('count', 0):,}</td></tr>"
                     f"<tr><td>VEHICLE TYPE</td><td>{d.get('vehicle_type','—')}</td></tr>"
@@ -2605,7 +2878,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.master_bar.setVisible(False)
 
         # --- Body splitter ---
-        splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
+        self.splitter = splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(1)
 
         # Left: searchable message tree
@@ -2863,13 +3136,13 @@ class MainWindow(QtWidgets.QMainWindow):
         QtCore.QTimer.singleShot(800, lambda: self._master_push(emit_slider=True))
         name = Path(result["path"]).name
         start_txt = fmt_istanbul(result["t_start"], with_date=True) if result.get("t_start") else "—"
-        msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} TR"
+        msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} {TZ_LABEL}"
         self.statusBar().showMessage(msg)
         self.header_summary.setText(
             f"<span style='color:{TEXT}'>{name}</span>"
             f"   ·   <span style='color:{ACCENT}'>{result['count']:,}</span> msgs"
             f"   ·   <span style='color:{ACCENT}'>{result['duration']:0.1f}s</span>"
-            f"   ·   <span style='color:{TEXT_DIM}'>{start_txt} TR</span>"
+            f"   ·   <span style='color:{TEXT_DIM}'>{start_txt} {TZ_LABEL}</span>"
         )
         self.header_summary.setTextFormat(Qt.TextFormat.RichText)
         # Status dot → live cyan
@@ -2998,8 +3271,8 @@ class MainWindow(QtWidgets.QMainWindow):
         lines.append(f"Messages:     {d['count']:,}")
         lines.append(f"Duration:     {d['duration']:0.2f} s ({d['duration']/60:0.2f} min)")
         if d.get("t_start"):
-            lines.append(f"Start (TR):   {fmt_istanbul(d['t_start'], with_date=True)}")
-            lines.append(f"End   (TR):   {fmt_istanbul(d['t_end'],   with_date=True)}")
+            lines.append(f"Start ({TZ_LABEL}):   {fmt_istanbul(d['t_start'], with_date=True)}")
+            lines.append(f"End   ({TZ_LABEL}):   {fmt_istanbul(d['t_end'],   with_date=True)}")
         lines.append(f"Vehicle type: {d.get('vehicle_type')}")
         lines.append("")
 
@@ -3007,7 +3280,7 @@ class MainWindow(QtWidgets.QMainWindow):
         mode_msgs = d["data"].get("MODE")
         mode_times = d["times"].get("MODE")
         if mode_msgs is not None and mode_times is not None and len(mode_times):
-            lines.append("Flight modes (Istanbul time):")
+            lines.append(f"Flight modes (local time, {TZ_LABEL}):")
             mode_field = "Mode" if "Mode" in mode_msgs else next(iter(mode_msgs.keys()))
             seen = []
             for t, m in zip(mode_times, mode_msgs[mode_field]):
@@ -3175,15 +3448,23 @@ class MainWindow(QtWidgets.QMainWindow):
                 f" border-left: 4px solid {it['color']}; border-radius:8px; }}"
                 f"QFrame:hover {{ background:{BG_3}; border-color:{it['color']}; }}"
             )
+            tip = it.get("tip", "")
+            if tip:
+                # Wrap long tooltip text to ~70 chars per line for readability
+                import textwrap
+                card.setToolTip(textwrap.fill(tip, width=72))
             v = QtWidgets.QVBoxLayout(card)
             v.setContentsMargins(16, 12, 16, 12)
             v.setSpacing(4)
 
             top = QtWidgets.QHBoxLayout()
-            cat = QtWidgets.QLabel(it["category"])
+            cat_lbl_txt = it["category"] + ("  ⓘ" if tip else "")
+            cat = QtWidgets.QLabel(cat_lbl_txt)
             cat.setStyleSheet(
                 f"color:{TEXT}; font-size:13px; font-weight:600; letter-spacing:0.3px;"
             )
+            if tip:
+                cat.setToolTip(textwrap.fill(tip, width=72))
             top.addWidget(cat)
             top.addStretch(1)
             badge = QtWidgets.QLabel(it["verdict"].upper())
@@ -3273,6 +3554,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_3d_points(self, pts):
         html = PLOT3D_HTML_TEMPLATE.replace("__PTS__", json.dumps(pts) if pts else "null")
+        html = html.replace("__TZLABEL__", TZ_LABEL)
         # Load airplane mesh (or fall back to "null" so JS uses a procedural shape)
         mesh_path = Path(__file__).parent / "airplane_mesh.json"
         if mesh_path.exists():
@@ -3358,6 +3640,7 @@ class MainWindow(QtWidgets.QMainWindow):
         html = INSTRUMENTS_HTML_TEMPLATE.replace(
             "__DATA__", json.dumps(data) if data else "null"
         )
+        html = html.replace("__TZLABEL__", TZ_LABEL)
         self.instruments_view.setHtml(html, QtCore.QUrl("https://localhost/"))
 
     def _on_instruments_loaded(self, ok: bool):
@@ -3368,56 +3651,95 @@ class MainWindow(QtWidgets.QMainWindow):
     def _populate_fft(self):
         for p in self.fft_plots:
             p.clear()
+            if p.plotItem.legend is None:
+                p.addLegend(brush=pg.mkBrush(BG_2), pen=pg.mkPen(BORDER),
+                            labelTextColor=TEXT)
+            else:
+                # Clear stale legend rows from a previous log
+                p.plotItem.legend.clear()
         if self.parsed is None:
             self.fft_info.setText("  No log loaded.")
             return
-        imu = self.parsed["data"].get("IMU")
-        imu_t = self.parsed["times"].get("IMU")
-        if not imu or imu_t is None or len(imu_t) < 256:
+
+        # Collect every IMU we can find: IMU (=IMU1), IMU2, IMU3
+        imus = []
+        for name in ("IMU", "IMU2", "IMU3"):
+            block = self.parsed["data"].get(name)
+            ts = self.parsed["times"].get(name)
+            if block and ts is not None and len(ts) >= 256:
+                imus.append((name, block, np.asarray(ts, dtype=float)))
+        if not imus:
             self.fft_info.setText("  Not enough IMU samples for FFT (need ≥256).")
             return
-        t = np.asarray(imu_t, dtype=float)
-        dts = np.diff(t)
-        dts = dts[dts > 0]
+
+        # Use primary IMU's sample rate for the info line
+        primary_t = imus[0][2]
+        dts = np.diff(primary_t); dts = dts[dts > 0]
         if len(dts) == 0:
             self.fft_info.setText("  IMU timestamps unusable.")
             return
-        fs = 1.0 / float(np.median(dts))
+        fs_primary = 1.0 / float(np.median(dts))
+        names = ", ".join(n for n, _, _ in imus)
         self.fft_info.setText(
-            f"  IMU sample rate ≈ {fs:.0f} Hz  ·  Nyquist {fs/2:.0f} Hz  ·  "
-            f"{len(t):,} samples  ·  peaks near motor RPM/60 = resonance"
+            f"  IMU sources: {names}  ·  primary sample rate ≈ {fs_primary:.0f} Hz "
+            f"·  Nyquist {fs_primary/2:.0f} Hz  ·  {len(primary_t):,} samples  "
+            f"·  peaks near motor RPM/60 = resonance"
         )
-        peak_colors = ["#22d3ee", "#a78bfa", "#fbbf24"]
-        for k, axis_field in enumerate(("AccX", "AccY", "AccZ")):
+
+        # Per-axis (one plot row), one curve per IMU
+        # IMU1 = solid bright, IMU2 = solid dimmed, IMU3 = dashed
+        axis_colors = {"X": "#22d3ee", "Y": "#a78bfa", "Z": "#fbbf24"}
+        line_styles = [
+            ("IMU",  None,          1.6),  # solid
+            ("IMU2", "#67e8f9",     1.4),  # dimmer cyan tint
+            ("IMU3", "#fbbf24",     1.2),  # dashed amber
+        ]
+        for k, axis_letter in enumerate(("X", "Y", "Z")):
             plot = self.fft_plots[k]
-            arr = imu.get(axis_field)
-            if arr is None or len(arr) < 256:
-                continue
-            sig = np.asarray(arr, dtype=float)
-            sig = sig - np.mean(sig)
-            n = len(sig)
-            # Hann window for cleaner peaks
-            win = np.hanning(n)
-            spec = np.abs(np.fft.rfft(sig * win)) * (2.0 / np.sum(win))
-            freqs = np.fft.rfftfreq(n, d=1.0 / fs)
-            # Drop the DC bin
-            freqs = freqs[1:]; spec = spec[1:]
-            plot.plot(freqs, spec, pen=pg.mkPen(peak_colors[k], width=1.5),
-                      name=f"Acc{axis_field[-1]}")
-            # Annotate top 3 peaks
-            if len(spec) > 10:
-                top_idx = np.argpartition(spec, -3)[-3:]
-                top_idx = top_idx[np.argsort(spec[top_idx])][::-1]
-                for idx in top_idx:
-                    f = float(freqs[idx])
-                    if f < 2: continue  # ignore near-DC drift
-                    line = pg.InfiniteLine(pos=f, angle=90,
-                        pen=pg.mkPen("#f87171", style=Qt.PenStyle.DashLine, width=1),
-                        label=f"{f:.1f} Hz",
-                        labelOpts={"position":0.92, "color":"#f87171",
-                                   "fill":pg.mkBrush(BG_2)})
-                    plot.addItem(line, ignoreBounds=True)
-            plot.setXRange(0, fs / 2)
+            axis_field = f"Acc{axis_letter}"
+            peaks_to_label = None  # only label peaks of primary IMU
+            for (imu_name, block, ts) in imus:
+                arr = block.get(axis_field)
+                if arr is None or len(arr) < 256:
+                    continue
+                sig = np.asarray(arr, dtype=float) - np.mean(arr)
+                n = len(sig)
+                win = np.hanning(n)
+                spec = np.abs(np.fft.rfft(sig * win)) * (2.0 / np.sum(win))
+                # Per-IMU sample rate
+                dts_i = np.diff(ts); dts_i = dts_i[dts_i > 0]
+                fs_i = 1.0 / float(np.median(dts_i)) if len(dts_i) else fs_primary
+                freqs = np.fft.rfftfreq(n, d=1.0 / fs_i)
+                freqs = freqs[1:]; spec = spec[1:]
+
+                # Choose pen
+                base = axis_colors[axis_letter]
+                if imu_name == "IMU":
+                    pen = pg.mkPen(base, width=1.8)
+                elif imu_name == "IMU2":
+                    pen = pg.mkPen(base, width=1.3, style=Qt.PenStyle.DashLine)
+                else:  # IMU3
+                    pen = pg.mkPen(base, width=1.0, style=Qt.PenStyle.DotLine)
+                plot.plot(freqs, spec, pen=pen,
+                          name=f"{imu_name}.{axis_field}")
+                if imu_name == "IMU":
+                    peaks_to_label = (freqs, spec)
+            # Top-3 peaks of the primary IMU only
+            if peaks_to_label is not None:
+                freqs, spec = peaks_to_label
+                if len(spec) > 10:
+                    top_idx = np.argpartition(spec, -3)[-3:]
+                    top_idx = top_idx[np.argsort(spec[top_idx])][::-1]
+                    for idx in top_idx:
+                        f = float(freqs[idx])
+                        if f < 2: continue
+                        line = pg.InfiniteLine(pos=f, angle=90,
+                            pen=pg.mkPen("#f87171", style=Qt.PenStyle.DashLine, width=1),
+                            label=f"{f:.1f} Hz",
+                            labelOpts={"position":0.92, "color":"#f87171",
+                                       "fill":pg.mkBrush(BG_2)})
+                        plot.addItem(line, ignoreBounds=True)
+            plot.setXRange(0, fs_primary / 2)
 
     # ----- PID tuning tab -----
     def _populate_pid(self):
