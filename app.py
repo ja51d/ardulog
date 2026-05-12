@@ -2911,148 +2911,169 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_welcome_page(self) -> QtWidgets.QWidget:
         page = QtWidgets.QWidget()
         outer = QtWidgets.QVBoxLayout(page)
-        outer.setContentsMargins(40, 30, 40, 30)
+        outer.setContentsMargins(40, 40, 40, 30)
         outer.setSpacing(0)
         outer.addStretch(1)
 
-        # Logo / title block
-        title = QtWidgets.QLabel("◆ UAV LOG VIEWER")
+        # Logo / title block — title stays neutral (white), accent is reserved
+        # for the single cyan focal point (the drop card).
+        title_row = QtWidgets.QHBoxLayout()
+        title_row.setSpacing(14)
+        title_row.addStretch(1)
+        logo_lbl = QtWidgets.QLabel("◆")
+        logo_lbl.setStyleSheet(
+            f"color:{ACCENT}; font-size:30px; font-weight:600;"
+        )
+        title_row.addWidget(logo_lbl)
+        title_text_col = QtWidgets.QVBoxLayout()
+        title_text_col.setSpacing(2)
+        title = QtWidgets.QLabel("UAV LOG VIEWER")
         title.setStyleSheet(
-            f"color:{ACCENT}; font-size:36px; font-weight:900; letter-spacing:8px;"
+            f"color:{TEXT}; font-size:30px; font-weight:900; letter-spacing:8px;"
             f"font-family: 'Inter Display', 'Inter', 'Helvetica Neue', sans-serif;"
         )
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(title)
-        sub = QtWidgets.QLabel("◢  ARDUPILOT TELEMETRY ANALYZER")
+        title_text_col.addWidget(title)
+        sub = QtWidgets.QLabel("ARDUPILOT TELEMETRY ANALYZER")
         sub.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:11px; letter-spacing:4px; font-weight:600;"
-            f"margin-top:6px;"
+            f"color:{TEXT_DIM}; font-size:10px; letter-spacing:4px; font-weight:700;"
         )
-        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(sub)
-        outer.addSpacing(38)
+        title_text_col.addWidget(sub)
+        title_row.addLayout(title_text_col)
+        title_row.addStretch(1)
+        outer.addLayout(title_row)
+        outer.addSpacing(46)
 
-        # Drop card
+        # Drop card — cleaner, single focal point. Just an icon + text + hint.
+        # No button or "or" divider inside; that just creates visual noise.
         self.welcome_drop = QtWidgets.QFrame()
-        self.welcome_drop.setMinimumHeight(220)
+        self.welcome_drop.setMinimumHeight(190)
+        self.welcome_drop.setMinimumWidth(560)
         self.welcome_drop.setMaximumWidth(720)
         self.welcome_drop.setStyleSheet(
-            f"QFrame {{ background:{BG_1}; border:2px dashed {ACCENT};"
-            f" border-radius:14px; }}"
+            f"QFrame {{"
+            f"  background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+            f"    stop:0 rgba(34,211,238,0.06), stop:1 rgba(34,211,238,0.02));"
+            f"  border:2px dashed rgba(34,211,238,0.55);"
+            f"  border-radius:14px;"
+            f"}}"
         )
         dl = QtWidgets.QVBoxLayout(self.welcome_drop)
-        dl.setContentsMargins(40, 30, 40, 30)
-        dl.setSpacing(14)
-        drop_label = QtWidgets.QLabel("⇣")
-        drop_label.setStyleSheet(f"color:{ACCENT}; font-size:54px; font-weight:300;")
-        drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dl.addWidget(drop_label)
-        drop_text = QtWidgets.QLabel(
-            "DROP A FLIGHT LOG HERE"
-            "<br><span style='font-weight:400;font-size:12px;color:" + TEXT_DIM + ";"
-            "letter-spacing:1.5px;'>.bin · .tlog · .log</span>"
+        dl.setContentsMargins(48, 36, 48, 36)
+        dl.setSpacing(10)
+        drop_icon = QtWidgets.QLabel("⇣")
+        drop_icon.setStyleSheet(
+            f"color:{ACCENT}; font-size:46px; font-weight:300; line-height:1;"
         )
+        drop_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dl.addWidget(drop_icon)
+        drop_text = QtWidgets.QLabel("DROP A FLIGHT LOG HERE")
         drop_text.setStyleSheet(
-            f"color:{TEXT}; font-size:14px; font-weight:700; letter-spacing:3px;"
+            f"color:{TEXT}; font-size:15px; font-weight:800; letter-spacing:4px;"
         )
-        drop_text.setTextFormat(Qt.TextFormat.RichText)
         drop_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         dl.addWidget(drop_text)
-        or_label = QtWidgets.QLabel("— OR —")
-        or_label.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:3px;"
+        drop_hint = QtWidgets.QLabel(".bin   ·   .tlog   ·   .log")
+        drop_hint.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-weight:600; letter-spacing:3px;"
         )
-        or_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dl.addWidget(or_label)
-        browse_btn = QtWidgets.QPushButton("◉  BROWSE FOR A LOG")
-        browse_btn.setObjectName("primary")
-        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        browse_btn.setMinimumHeight(42)
-        browse_btn.clicked.connect(self.open_file)
-        dl.addWidget(browse_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dl.addWidget(drop_hint)
 
         wrap = QtWidgets.QHBoxLayout()
         wrap.addStretch(1)
         wrap.addWidget(self.welcome_drop)
         wrap.addStretch(1)
         outer.addLayout(wrap)
-        outer.addSpacing(28)
+        outer.addSpacing(22)
 
-        # Recent files
+        # Action row: Browse (primary), Preferences (secondary). Centered.
+        actions = QtWidgets.QHBoxLayout()
+        actions.setSpacing(10)
+        actions.addStretch(1)
+        browse_btn = QtWidgets.QPushButton("◉  BROWSE FOR A LOG")
+        browse_btn.setObjectName("primary")
+        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        browse_btn.setMinimumHeight(42)
+        browse_btn.setMinimumWidth(220)
+        browse_btn.clicked.connect(self.open_file)
+        actions.addWidget(browse_btn)
+        pref_btn = QtWidgets.QPushButton("⚙  PREFERENCES")
+        pref_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        pref_btn.setMinimumHeight(42)
+        pref_btn.clicked.connect(self.open_preferences)
+        actions.addWidget(pref_btn)
+        actions.addStretch(1)
+        outer.addLayout(actions)
+        outer.addSpacing(36)
+
+        # Recent files — quiet, only the section header has a thin divider
+        recent_wrap = QtWidgets.QHBoxLayout()
+        recent_wrap.addStretch(1)
+        recent_col = QtWidgets.QVBoxLayout()
+        recent_col.setSpacing(6)
+        recent_col.setContentsMargins(0, 0, 0, 0)
         self.welcome_recent_label = QtWidgets.QLabel("RECENT LOGS")
         self.welcome_recent_label.setStyleSheet(
             f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:2.5px;"
-            f"margin-bottom:6px;"
+            f"padding-bottom:4px; border-bottom:1px solid {BORDER};"
         )
-        self.welcome_recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(self.welcome_recent_label)
-        self.welcome_recent_list = QtWidgets.QVBoxLayout()
-        self.welcome_recent_list.setSpacing(4)
-        recent_wrap = QtWidgets.QHBoxLayout()
+        recent_col.addWidget(self.welcome_recent_label)
+        self._welcome_recent_inner = recent_col
+        recent_wrap.addLayout(recent_col)
         recent_wrap.addStretch(1)
-        recent_inner = QtWidgets.QVBoxLayout()
-        recent_inner.setSpacing(4)
-        recent_wrap.addLayout(recent_inner)
-        recent_wrap.addStretch(1)
-        self._welcome_recent_inner = recent_inner
         outer.addLayout(recent_wrap)
-        outer.addSpacing(24)
+        outer.addStretch(2)
 
-        # Bottom action row: Preferences, Quit
-        actions = QtWidgets.QHBoxLayout()
-        actions.addStretch(1)
-        pref_btn = QtWidgets.QPushButton("⚙  PREFERENCES")
-        pref_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        pref_btn.clicked.connect(self.open_preferences)
-        actions.addWidget(pref_btn)
+        # Footer credit + quit
+        footer_row = QtWidgets.QHBoxLayout()
+        footer_row.setContentsMargins(0, 12, 0, 0)
         quit_btn = QtWidgets.QPushButton("✕  QUIT")
         quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         quit_btn.clicked.connect(self.close)
-        actions.addWidget(quit_btn)
-        actions.addStretch(1)
-        outer.addLayout(actions)
-        outer.addStretch(1)
-
-        # Footer credit
+        footer_row.addWidget(quit_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+        footer_row.addStretch(1)
         credit = QtWidgets.QLabel(
             f"<span style='color:{TEXT_DIM};font-size:10px;letter-spacing:2px;font-weight:600;'>CREATED BY</span>"
             f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:14px;font-weight:800;letter-spacing:2px;'>JAVID</span>"
         )
         credit.setTextFormat(Qt.TextFormat.RichText)
-        credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(credit)
+        footer_row.addWidget(credit, alignment=Qt.AlignmentFlag.AlignRight)
+        outer.addLayout(footer_row)
 
         self._refresh_welcome_recents()
         return page
 
     def _refresh_welcome_recents(self):
-        # Clear and rebuild the recent-files row on the welcome screen
+        # Rebuild the recent-files rows; keep the 'RECENT LOGS' header at the
+        # top of the column.
         if not hasattr(self, "_welcome_recent_inner"):
             return
         layout = self._welcome_recent_inner
-        while layout.count():
-            it = layout.takeAt(0)
+        # Remove every widget except the section header (index 0)
+        while layout.count() > 1:
+            it = layout.takeAt(1)
             w = it.widget()
             if w: w.deleteLater()
         if not self.recent_files:
             empty = QtWidgets.QLabel("(none yet — drop a log above)")
-            empty.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px;")
-            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty.setStyleSheet(
+                f"color:{TEXT_DIM}; font-size:11px; font-style:italic;"
+                f"padding:6px 4px;"
+            )
             layout.addWidget(empty)
             return
-        for path in self.recent_files[:6]:
+        for path in self.recent_files[:5]:
             short = Path(path).name
             row = QtWidgets.QPushButton(f"  {short}")
             row.setCursor(Qt.CursorShape.PointingHandCursor)
             row.setToolTip(path)
-            row.setMinimumWidth(420)
+            row.setMinimumWidth(560)
             row.setStyleSheet(
-                f"QPushButton {{ background:{BG_2}; color:{TEXT};"
-                f" border:1px solid {BORDER}; border-radius:6px;"
-                f" padding:8px 14px; text-align:left;"
+                f"QPushButton {{ background:transparent; color:{TEXT_DIM};"
+                f" border:none; padding:6px 4px; text-align:left;"
                 f" font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
                 f" font-size:12px; }}"
-                f"QPushButton:hover {{ background:{BG_3}; border-color:{ACCENT}; color:{ACCENT}; }}"
+                f"QPushButton:hover {{ color:{ACCENT}; }}"
             )
             row.clicked.connect(lambda checked=False, p=path: self.load_file(p))
             layout.addWidget(row)
