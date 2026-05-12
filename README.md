@@ -60,7 +60,8 @@ A native desktop log viewer and **automatic health analyzer** for ArduPilot Data
 <img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 48 55 PM" src="https://github.com/user-attachments/assets/141f71e9-37e3-4bc2-b881-35f4f0695e3c" />
 
 <img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 49 15 PM" src="https://github.com/user-attachments/assets/cb66780c-4381-450d-9019-85733814b05b" />
-<img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 49 07 PM" src="https://github.com/user-attachments/assets/fc81a5f9-a3b4-4bd0-b38f-f28e2e240e76" />
+<img width="1680" height="1050" alt="Screenshot 2026-05-12 at 3 24 36 PM" src="https://github.com/user-attachments/assets/fc4ec5fb-d62c-4aa6-b52d-2340e07899db" />
+
 
 
 ---
