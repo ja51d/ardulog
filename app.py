@@ -339,6 +339,20 @@ QPushButton#violet {{
     letter-spacing: 0.5px;
     padding: 7px 18px;
 }}
+QPushButton#icon {{
+    background: {BG_2};
+    color: {TEXT};
+    border: 1px solid {BORDER};
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 18px;
+    font-weight: 400;
+}}
+QPushButton#icon:hover {{
+    background: {BG_3};
+    border-color: {ACCENT};
+    color: {ACCENT};
+}}
 QPushButton#violet:hover {{
     background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
                 stop:0 #c4b5fd, stop:1 {ACCENT_2});
@@ -369,37 +383,62 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
   #row-instruments{grid-template-columns:repeat(4,1fr);flex:1 1 280px}
   #row-sticks{flex:0 0 220px}
   #ctrl{flex:0 0 auto}
-  .panel{background:linear-gradient(180deg,#16223c 0%,#111a2e 100%);
-         border:1px solid #243154;border-radius:12px;
-         padding:14px;display:flex;flex-direction:column;align-items:center;
-         min-height:0;box-shadow:0 4px 18px rgba(0,0,0,0.25)}
-  .panel h3{margin:0 0 10px;color:#8b97b3;font-size:10px;letter-spacing:2.5px;
-            font-weight:700;text-align:center}
+  .panel{background:
+           radial-gradient(circle at 50% 0%, rgba(34,211,238,0.06) 0%, rgba(0,0,0,0) 60%),
+           linear-gradient(180deg,#1a2740 0%,#0e172a 100%);
+         border:1px solid #2a3a5a; border-radius:14px;
+         padding:14px 14px 12px; display:flex; flex-direction:column;
+         align-items:center; min-height:0;
+         box-shadow: 0 8px 24px rgba(0,0,0,0.45),
+                     inset 0 1px 0 rgba(255,255,255,0.05),
+                     inset 0 0 0 1px rgba(34,211,238,0.05)}
+  .panel h3{margin:0 0 10px; color:#8b97b3; font-size:10px; letter-spacing:3px;
+            font-weight:800; text-align:center;
+            padding-bottom:6px; width:100%;
+            border-bottom: 1px solid rgba(34,211,238,0.18)}
   .panel svg{flex:1;min-height:0;width:100%}
-  .readout{margin-top:8px;font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
-           color:#22d3ee;font-size:13px;font-weight:700;letter-spacing:1px;
-           text-align:center;white-space:nowrap}
-  .readout .dim{color:#8b97b3;font-weight:400;letter-spacing:1.5px;font-size:10px}
+  .readout{margin-top:10px; padding:6px 12px;
+           background:rgba(11,18,32,0.7); border:1px solid rgba(34,211,238,0.2);
+           border-radius:6px;
+           font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
+           color:#22d3ee; font-size:13px; font-weight:700; letter-spacing:1.2px;
+           text-align:center; white-space:nowrap;
+           text-shadow:0 0 8px rgba(34,211,238,0.4)}
+  .readout .dim{color:#5b7196; font-weight:600; letter-spacing:1.5px; font-size:10px;
+                text-shadow:none}
 
-  /* Radio transmitter — single teal-cyan housing with two circular gimbals */
+  /* Radio transmitter — brushed-metal style housing with two gimbals */
   .rc-housing{
-    background:linear-gradient(180deg,#0f9d9e 0%,#0d7a8a 100%);
-    border:1px solid #22d3ee;border-radius:18px;
-    box-shadow:0 8px 26px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
-    padding:18px 24px;
-    display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;
+    background:
+      radial-gradient(ellipse at 30% 0%, rgba(34,211,238,0.10) 0%, rgba(0,0,0,0) 60%),
+      linear-gradient(180deg,#1f2a40 0%,#0e1626 100%);
+    border:1px solid #2a3a5a; border-radius:18px;
+    box-shadow:
+      0 10px 30px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 0 0 1px rgba(34,211,238,0.08);
+    padding:14px 26px 18px;
+    display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center;
     position:relative;min-height:0
   }
-  .rc-housing::before, .rc-housing::after{
-    content:'';position:absolute;width:14px;height:14px;color:#e6edf7;opacity:0.5;font-size:14px
+  .rc-housing::before{
+    content:'';position:absolute;top:0;left:24px;right:24px;height:1px;
+    background:linear-gradient(90deg, transparent 0%, rgba(34,211,238,0.45) 50%, transparent 100%)
   }
-  .rc-housing::before{top:10px;left:14px;content:'✥'}
-  .rc-housing::after{bottom:10px;right:14px;content:'▲';transform:rotate(45deg)}
   .gimbal-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:0}
-  .gimbal-wrap svg{flex:1;min-height:0;width:100%;max-width:200px}
-  .gimbal-label{font-size:9px;letter-spacing:2.5px;font-weight:700;color:#0b1220;text-align:center;text-transform:uppercase}
-  .gimbal-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;color:#0b1220;
-                  font-size:11px;font-weight:700;letter-spacing:0.5px;text-align:center;white-space:nowrap}
+  .gimbal-wrap svg{flex:1;min-height:0;width:100%;max-width:220px}
+  .gimbal-label{font-size:9px;letter-spacing:3px;font-weight:800;color:#5b7196;
+                text-align:center;text-transform:uppercase;margin-top:2px}
+  .gimbal-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;color:#22d3ee;
+                  font-size:11px;font-weight:700;letter-spacing:0.5px;text-align:center;
+                  white-space:nowrap;text-shadow:0 0 6px rgba(34,211,238,0.35)}
+  .gimbal-readout .dim{color:#5b7196;text-shadow:none;font-weight:600}
+  /* Center spine between the two gimbals — looks like a real transmitter */
+  .rc-center{display:flex;flex-direction:column;align-items:center;gap:14px;
+             padding:0 8px;color:#5b7196;font-size:9px;letter-spacing:2px;
+             font-weight:800;text-align:center;font-family:"Inter",sans-serif}
+  .rc-led{width:8px;height:8px;border-radius:50%;background:#22d3ee;
+          box-shadow:0 0 10px #22d3ee, 0 0 20px rgba(34,211,238,0.5)}
 
   /* Control bar — always visible at bottom */
   #ctrl{display:flex;align-items:center;gap:14px;padding:12px 18px;
@@ -427,30 +466,30 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
          box-shadow:0 0 10px rgba(34,211,238,0.7)}
   #time-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
          color:#22d3ee;font-size:14px;font-weight:700;letter-spacing:1px;min-width:160px;text-align:right}
-  .ai-bg{fill:#0b1220}
-  .ai-sky{fill:#1d4ed8}
-  .ai-ground{fill:#854d0e}
-  .ai-horizon{stroke:#e6edf7;stroke-width:1.5}
-  .ai-pitch-tick{stroke:#e6edf7;stroke-width:1;stroke-linecap:round}
-  .ai-pitch-label{fill:#e6edf7;font-size:7px;font-family:"JetBrains Mono",monospace;font-weight:700}
-  .ai-frame{fill:none;stroke:#243154;stroke-width:2}
-  .ai-aircraft{fill:none;stroke:#fbbf24;stroke-width:2.5;stroke-linecap:round}
-  .ai-roll-tick{stroke:#e6edf7;stroke-width:1.2}
+  .ai-bg{fill:#06101e}
+  .ai-sky{fill:#1e3a8a}        /* deeper sky */
+  .ai-ground{fill:#7c2d12}     /* richer brown */
+  .ai-horizon{stroke:#ffffff;stroke-width:2}
+  .ai-pitch-tick{stroke:#ffffff;stroke-width:1.1;stroke-linecap:round;opacity:0.95}
+  .ai-pitch-label{fill:#ffffff;font-size:7px;font-family:"JetBrains Mono",monospace;font-weight:700}
+  .ai-frame{fill:none;stroke:#2a3a5a;stroke-width:2.5}
+  .ai-aircraft{fill:none;stroke:#fbbf24;stroke-width:3;stroke-linecap:round}
+  .ai-roll-tick{stroke:#ffffff;stroke-width:1.2}
   .ai-roll-pointer{fill:#fbbf24}
-  .hsi-card{fill:#0b1220;stroke:#243154}
+  .hsi-card{fill:#06101e;stroke:#2a3a5a;stroke-width:2}
   .hsi-tick{stroke:#e6edf7;stroke-width:1.2;stroke-linecap:round}
-  .hsi-cardinal{fill:#22d3ee;font-size:14px;font-weight:800;font-family:"Inter",sans-serif;text-anchor:middle}
+  .hsi-cardinal{fill:#22d3ee;font-size:15px;font-weight:900;font-family:"Inter",sans-serif;text-anchor:middle}
   .hsi-deg{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;text-anchor:middle}
-  .hsi-aircraft{fill:#fbbf24;stroke:#0b1220;stroke-width:1}
-  .tape-bg{fill:#0b1220;stroke:#243154}
-  .tape-tick{stroke:#8b97b3;stroke-width:1}
+  .hsi-aircraft{fill:#fbbf24;stroke:#06101e;stroke-width:1}
+  .tape-bg{fill:#06101e;stroke:#2a3a5a;stroke-width:1.5}
+  .tape-tick{stroke:#5b7196;stroke-width:1}
   .tape-tick-major{stroke:#e6edf7;stroke-width:1.5}
-  .tape-label{fill:#8b97b3;font-size:9px;font-family:"JetBrains Mono",monospace}
+  .tape-label{fill:#8b97b3;font-size:9px;font-family:"JetBrains Mono",monospace;font-weight:600}
   .tape-marker{fill:#22d3ee}
   .tape-current{fill:#22d3ee;font-size:14px;font-weight:800;font-family:"JetBrains Mono",monospace;text-anchor:middle}
-  .stick-frame{fill:#0b1220;stroke:#243154;stroke-width:1.5}
-  .stick-cross{stroke:#243154;stroke-width:1}
-  .stick-dot{fill:#22d3ee;stroke:#0b1220;stroke-width:2}
+  .stick-frame{fill:#06101e;stroke:#2a3a5a;stroke-width:1.5}
+  .stick-cross{stroke:#2a3a5a;stroke-width:1}
+  .stick-dot{fill:#22d3ee;stroke:#06101e;stroke-width:2}
   .stick-axis{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;font-weight:600;letter-spacing:1.5px}
 </style>
 </head><body>
@@ -571,8 +610,12 @@ if (!D) {
           </svg>
           <div class="gimbal-label">THROTTLE · YAW</div>
           <div class="gimbal-readout">
-            THR <span id="stick-l-thr">1500</span> &nbsp;·&nbsp; YAW <span id="stick-l-yaw">1500</span>
+            <span class="dim">THR</span> <span id="stick-l-thr">1500</span> &nbsp;·&nbsp; <span class="dim">YAW</span> <span id="stick-l-yaw">1500</span>
           </div>
+        </div>
+        <div class="rc-center">
+          <div class="rc-led"></div>
+          <div>RC<br>INPUT</div>
         </div>
         <div class="gimbal-wrap">
           <svg viewBox="-110 -110 220 220" preserveAspectRatio="xMidYMid meet">
@@ -585,7 +628,7 @@ if (!D) {
           </svg>
           <div class="gimbal-label">PITCH · ROLL</div>
           <div class="gimbal-readout">
-            PIT <span id="stick-r-pit">1500</span> &nbsp;·&nbsp; ROLL <span id="stick-r-rol">1500</span>
+            <span class="dim">PIT</span> <span id="stick-r-pit">1500</span> &nbsp;·&nbsp; <span class="dim">ROLL</span> <span id="stick-r-rol">1500</span>
           </div>
         </div>
       </div>
@@ -2381,6 +2424,12 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    # ----- Welcome -----
+    def show_welcome(self):
+        if hasattr(self, "stacked"):
+            self._refresh_welcome_recents()
+            self.stacked.setCurrentIndex(0)
+
     # ----- Preferences -----
     def open_preferences(self):
         dlg = PreferencesDialog(self)
@@ -2485,6 +2534,10 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu.addAction(quit_act)
 
         view_menu = bar.addMenu("&View")
+        welcome_act = QtGui.QAction("Back to &welcome screen", self)
+        welcome_act.triggered.connect(self.show_welcome)
+        view_menu.addAction(welcome_act)
+        view_menu.addSeparator()
         clear_act = QtGui.QAction("Clear plot", self)
         clear_act.triggered.connect(self.clear_plot)
         view_menu.addAction(clear_act)
@@ -2545,6 +2598,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.config["recent"] = self.recent_files
         self._save_config()
         self._rebuild_recent_menu()
+        self._refresh_welcome_recents()
 
     def _rebuild_recent_menu(self):
         if not hasattr(self, "recent_menu"):
@@ -2844,8 +2898,170 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "CSV export failed", str(exc))
 
     def _build_ui(self):
+        # Use a stacked widget: page 0 = welcome screen, page 1 = main UI.
+        # The main UI is built immediately so that tabs/web views are warm
+        # by the time the user opens their first log.
+        self.stacked = QtWidgets.QStackedWidget()
+        self.stacked.addWidget(self._build_welcome_page())  # index 0
+        self._build_main_ui()  # populates page 1 via self._main_root
+        self.stacked.addWidget(self._main_root)             # index 1
+        self.setCentralWidget(self.stacked)
+        self.stacked.setCurrentIndex(0)
+
+    def _build_welcome_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        outer = QtWidgets.QVBoxLayout(page)
+        outer.setContentsMargins(40, 30, 40, 30)
+        outer.setSpacing(0)
+        outer.addStretch(1)
+
+        # Logo / title block
+        title = QtWidgets.QLabel("◆ UAV LOG VIEWER")
+        title.setStyleSheet(
+            f"color:{ACCENT}; font-size:36px; font-weight:900; letter-spacing:8px;"
+            f"font-family: 'Inter Display', 'Inter', 'Helvetica Neue', sans-serif;"
+        )
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        outer.addWidget(title)
+        sub = QtWidgets.QLabel("◢  ARDUPILOT TELEMETRY ANALYZER")
+        sub.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; letter-spacing:4px; font-weight:600;"
+            f"margin-top:6px;"
+        )
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        outer.addWidget(sub)
+        outer.addSpacing(38)
+
+        # Drop card
+        self.welcome_drop = QtWidgets.QFrame()
+        self.welcome_drop.setMinimumHeight(220)
+        self.welcome_drop.setMaximumWidth(720)
+        self.welcome_drop.setStyleSheet(
+            f"QFrame {{ background:{BG_1}; border:2px dashed {ACCENT};"
+            f" border-radius:14px; }}"
+        )
+        dl = QtWidgets.QVBoxLayout(self.welcome_drop)
+        dl.setContentsMargins(40, 30, 40, 30)
+        dl.setSpacing(14)
+        drop_label = QtWidgets.QLabel("⇣")
+        drop_label.setStyleSheet(f"color:{ACCENT}; font-size:54px; font-weight:300;")
+        drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dl.addWidget(drop_label)
+        drop_text = QtWidgets.QLabel(
+            "DROP A FLIGHT LOG HERE"
+            "<br><span style='font-weight:400;font-size:12px;color:" + TEXT_DIM + ";"
+            "letter-spacing:1.5px;'>.bin · .tlog · .log</span>"
+        )
+        drop_text.setStyleSheet(
+            f"color:{TEXT}; font-size:14px; font-weight:700; letter-spacing:3px;"
+        )
+        drop_text.setTextFormat(Qt.TextFormat.RichText)
+        drop_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dl.addWidget(drop_text)
+        or_label = QtWidgets.QLabel("— OR —")
+        or_label.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:3px;"
+        )
+        or_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dl.addWidget(or_label)
+        browse_btn = QtWidgets.QPushButton("◉  BROWSE FOR A LOG")
+        browse_btn.setObjectName("primary")
+        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        browse_btn.setMinimumHeight(42)
+        browse_btn.clicked.connect(self.open_file)
+        dl.addWidget(browse_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        wrap = QtWidgets.QHBoxLayout()
+        wrap.addStretch(1)
+        wrap.addWidget(self.welcome_drop)
+        wrap.addStretch(1)
+        outer.addLayout(wrap)
+        outer.addSpacing(28)
+
+        # Recent files
+        self.welcome_recent_label = QtWidgets.QLabel("RECENT LOGS")
+        self.welcome_recent_label.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:2.5px;"
+            f"margin-bottom:6px;"
+        )
+        self.welcome_recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        outer.addWidget(self.welcome_recent_label)
+        self.welcome_recent_list = QtWidgets.QVBoxLayout()
+        self.welcome_recent_list.setSpacing(4)
+        recent_wrap = QtWidgets.QHBoxLayout()
+        recent_wrap.addStretch(1)
+        recent_inner = QtWidgets.QVBoxLayout()
+        recent_inner.setSpacing(4)
+        recent_wrap.addLayout(recent_inner)
+        recent_wrap.addStretch(1)
+        self._welcome_recent_inner = recent_inner
+        outer.addLayout(recent_wrap)
+        outer.addSpacing(24)
+
+        # Bottom action row: Preferences, Quit
+        actions = QtWidgets.QHBoxLayout()
+        actions.addStretch(1)
+        pref_btn = QtWidgets.QPushButton("⚙  PREFERENCES")
+        pref_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        pref_btn.clicked.connect(self.open_preferences)
+        actions.addWidget(pref_btn)
+        quit_btn = QtWidgets.QPushButton("✕  QUIT")
+        quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        quit_btn.clicked.connect(self.close)
+        actions.addWidget(quit_btn)
+        actions.addStretch(1)
+        outer.addLayout(actions)
+        outer.addStretch(1)
+
+        # Footer credit
+        credit = QtWidgets.QLabel(
+            f"<span style='color:{TEXT_DIM};font-size:10px;letter-spacing:2px;font-weight:600;'>CREATED BY</span>"
+            f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:14px;font-weight:800;letter-spacing:2px;'>JAVID</span>"
+        )
+        credit.setTextFormat(Qt.TextFormat.RichText)
+        credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        outer.addWidget(credit)
+
+        self._refresh_welcome_recents()
+        return page
+
+    def _refresh_welcome_recents(self):
+        # Clear and rebuild the recent-files row on the welcome screen
+        if not hasattr(self, "_welcome_recent_inner"):
+            return
+        layout = self._welcome_recent_inner
+        while layout.count():
+            it = layout.takeAt(0)
+            w = it.widget()
+            if w: w.deleteLater()
+        if not self.recent_files:
+            empty = QtWidgets.QLabel("(none yet — drop a log above)")
+            empty.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px;")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(empty)
+            return
+        for path in self.recent_files[:6]:
+            short = Path(path).name
+            row = QtWidgets.QPushButton(f"  {short}")
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.setToolTip(path)
+            row.setMinimumWidth(420)
+            row.setStyleSheet(
+                f"QPushButton {{ background:{BG_2}; color:{TEXT};"
+                f" border:1px solid {BORDER}; border-radius:6px;"
+                f" padding:8px 14px; text-align:left;"
+                f" font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
+                f" font-size:12px; }}"
+                f"QPushButton:hover {{ background:{BG_3}; border-color:{ACCENT}; color:{ACCENT}; }}"
+            )
+            row.clicked.connect(lambda checked=False, p=path: self.load_file(p))
+            layout.addWidget(row)
+
+    def _build_main_ui(self):
+        """Build the original tabbed UI; stored as self._main_root (a QWidget)."""
         # Root container with header on top, splitter below
         root = QtWidgets.QWidget()
+        self._main_root = root
         root_layout = QtWidgets.QVBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
@@ -2937,6 +3153,16 @@ class MainWindow(QtWidgets.QMainWindow):
             "Save a one-page flight report (Auto Review + mode timeline + incidents) as PDF.")
         self.export_btn.clicked.connect(self.export_pdf_report)
         h.addWidget(self.export_btn)
+
+        # Preferences gear — always visible in the header so it's discoverable
+        self.prefs_btn = QtWidgets.QPushButton("⚙")
+        self.prefs_btn.setObjectName("icon")
+        self.prefs_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.prefs_btn.setMinimumHeight(38)
+        self.prefs_btn.setMinimumWidth(42)
+        self.prefs_btn.setToolTip("Preferences (timezone, etc.) — ⌘,")
+        self.prefs_btn.clicked.connect(self.open_preferences)
+        h.addWidget(self.prefs_btn)
 
         open_btn = QtWidgets.QPushButton("◉  OPEN LOG")
         open_btn.setObjectName("primary")
@@ -3196,9 +3422,9 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter.setSizes([340, 1160])
         root_layout.addWidget(splitter, 1)
 
-        self.setCentralWidget(root)
-
-        self.statusBar().showMessage("Open a .bin log (⌘O / Ctrl+O) to begin")
+        # NOTE: don't call setCentralWidget here — _build_ui wraps this root
+        # into a QStackedWidget alongside the welcome page.
+        self.statusBar().showMessage("Drop a .bin log onto the window to begin")
 
     # ----- File loading -----
     def open_file(self):
@@ -3262,6 +3488,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # Reset cross-tab sync state (each tab has its own play controls)
         self.master_t = 0.0
         self.master_playing = False
+        # Hide the welcome screen and show the main UI
+        if hasattr(self, "stacked"):
+            self.stacked.setCurrentIndex(1)
         name = Path(result["path"]).name
         start_txt = fmt_istanbul(result["t_start"], with_date=True) if result.get("t_start") else "—"
         msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} {TZ_LABEL}"
