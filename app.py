@@ -2656,71 +2656,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.comparison = None
         self.statusBar().showMessage("Comparison overlay cleared.")
 
-    # ----- Master synchronized playback -----
-    def _toggle_master_play(self):
+    # ----- Cross-tab sync (used by incident click-to-jump) -----
+    def _master_push(self, emit_slider: bool = True):  # emit_slider kept for API compat
+        """Push `self.master_t` to every web view that defines window.setPos()."""
         if self.parsed is None:
             return
-        if self.master_playing:
-            self.master_playing = False
-            self.master_timer.stop()
-            self.master_play_btn.setText("▶ PLAY ALL")
-        else:
-            duration = float(self.parsed.get("duration", 0))
-            if self.master_t >= duration - 0.05:
-                self.master_t = 0.0
-            self.master_playing = True
-            self.master_play_btn.setText("❚❚ PAUSE")
-            self.master_last_ts = time.monotonic()
-            self.master_timer.start()
-
-    def _master_reset(self):
-        self.master_playing = False
-        self.master_timer.stop()
-        self.master_play_btn.setText("▶ PLAY ALL")
-        self.master_t = 0.0
-        self._master_push()
-
-    def _master_tick(self):
-        if not self.master_playing or self.parsed is None:
-            return
-        now = time.monotonic()
-        dt = now - self.master_last_ts
-        self.master_last_ts = now
-        duration = float(self.parsed.get("duration", 0))
-        self.master_t += dt
-        if self.master_t >= duration:
-            self.master_t = duration
-            self._toggle_master_play()
-        self._master_push()
-
-    def _on_master_slider_changed(self, value: int):
-        if self.parsed is None:
-            return
-        duration = float(self.parsed.get("duration", 0))
-        new_t = (value / 1000.0) * duration
-        # Only act if change came from user interaction (not our own update)
-        if abs(new_t - self.master_t) < 1e-6:
-            return
-        # If user scrubs while playing, pause
-        if self.master_playing:
-            self._toggle_master_play()
-        self.master_t = new_t
-        self._master_push(emit_slider=False)
-
-    def _master_push(self, emit_slider: bool = True):
-        if self.parsed is None:
-            return
-        duration = max(0.001, float(self.parsed.get("duration", 0)))
-        # Time label
-        self.master_time_label.setText(
-            f"T+{self.master_t:6.1f}s  ·  {self.master_t/duration*100:5.1f}%"
-        )
-        # Slider sync (block signal to avoid feedback)
-        if emit_slider:
-            self.master_slider.blockSignals(True)
-            self.master_slider.setValue(int((self.master_t / duration) * 1000))
-            self.master_slider.blockSignals(False)
-        # Push to web views
         code = f"if (typeof window.setPos === 'function') window.setPos({self.master_t});"
         for v in (self.instruments_view, self.view3d, self.map_view):
             try:
@@ -3015,67 +2955,11 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         root_layout.addWidget(accent_line)
 
-        # Master playback bar — drives Cockpit + 3D + Map at the same wall-clock
-        self.master_bar = QtWidgets.QFrame()
-        self.master_bar.setStyleSheet(
-            f"background:{BG_1};border-bottom:1px solid {BORDER};"
-        )
-        self.master_bar.setFixedHeight(48)
-        mb = QtWidgets.QHBoxLayout(self.master_bar)
-        mb.setContentsMargins(16, 6, 16, 6)
-        mb.setSpacing(12)
-
-        mlabel = QtWidgets.QLabel("◈ MASTER TIMELINE")
-        mlabel.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:10px; font-weight:700;"
-            f"letter-spacing:2px;"
-        )
-        mb.addWidget(mlabel)
-
-        self.master_play_btn = QtWidgets.QPushButton("▶ PLAY ALL")
-        self.master_play_btn.setObjectName("primary")
-        self.master_play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.master_play_btn.setMinimumWidth(110)
-        self.master_play_btn.clicked.connect(self._toggle_master_play)
-        mb.addWidget(self.master_play_btn)
-
-        self.master_reset_btn = QtWidgets.QPushButton("⏮")
-        self.master_reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.master_reset_btn.clicked.connect(self._master_reset)
-        mb.addWidget(self.master_reset_btn)
-
-        self.master_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
-        self.master_slider.setMinimum(0)
-        self.master_slider.setMaximum(1000)
-        self.master_slider.setStyleSheet(
-            f"QSlider::groove:horizontal {{ height:6px; background:{BG_3}; border-radius:3px; }}"
-            f"QSlider::handle:horizontal {{ width:16px; margin:-6px 0; background:{ACCENT};"
-            f"border:2px solid {BG_0}; border-radius:9px; }}"
-            f"QSlider::sub-page:horizontal {{ background:{ACCENT}; border-radius:3px; }}"
-        )
-        self.master_slider.valueChanged.connect(self._on_master_slider_changed)
-        mb.addWidget(self.master_slider, 1)
-
-        self.master_time_label = QtWidgets.QLabel("T+0.0s")
-        self.master_time_label.setStyleSheet(
-            f"color:{ACCENT};font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
-            f"font-weight:700;min-width:140px;font-size:12px;"
-        )
-        self.master_time_label.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        mb.addWidget(self.master_time_label)
-
-        root_layout.addWidget(self.master_bar)
-
-        # Master playback state
-        self.master_t = 0.0           # seconds since flight start
+        # Master playback bar removed — each tab has its own play controls.
+        # We keep a master time variable so incident-click can still sync
+        # the cockpit/3D/map views via runJavaScript(setPos).
+        self.master_t = 0.0
         self.master_playing = False
-        self.master_last_ts = 0.0
-        self.master_timer = QtCore.QTimer(self)
-        self.master_timer.setInterval(33)  # ~30 fps
-        self.master_timer.timeout.connect(self._master_tick)
-        self.master_bar.setEnabled(False)
-        self.master_bar.setVisible(False)
 
         # --- Body splitter ---
         self.splitter = splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
@@ -3375,15 +3259,9 @@ class MainWindow(QtWidgets.QMainWindow):
             ax = pid_plot.getAxis("bottom")
             if hasattr(ax, "set_t_start"):
                 ax.set_t_start(t0)
-        # Reset & enable master timeline
-        self.master_playing = False
-        self.master_timer.stop()
+        # Reset cross-tab sync state (each tab has its own play controls)
         self.master_t = 0.0
-        self.master_bar.setEnabled(True)
-        self.master_bar.setVisible(True)
-        self.master_play_btn.setText("▶ PLAY ALL")
-        # Push initial position once web views finish loading
-        QtCore.QTimer.singleShot(800, lambda: self._master_push(emit_slider=True))
+        self.master_playing = False
         name = Path(result["path"]).name
         start_txt = fmt_istanbul(result["t_start"], with_date=True) if result.get("t_start") else "—"
         msg = f"◉  LOG ACTIVE   ·   {name}   ·   {result['count']:,} MSGS   ·   {result['duration']:0.1f}s   ·   START {start_txt} {TZ_LABEL}"
