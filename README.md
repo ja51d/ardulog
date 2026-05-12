@@ -1,10 +1,10 @@
 
 
 # About Me
-Hey there, thank you for checking out my UAV Log Viewer!
+Hey there, thank you for checking out my ArduPilot UAV Log Viewer!
 My name is Javid I'm 21, I'm an astronautics engineer and I'm highly interested in UAV engineering, I built my first UAV a year ago and then I decided to create this program. 
 
-# UAV Log Viewer
+# ArduPilot UAV Log Viewer
 
 A native desktop log viewer and **automatic health analyzer** for ArduPilot DataFlash (`.bin`) flight logs. Inspired by [plot.ardupilot.org](https://plot.ardupilot.org/), but offline and as a real desktop application with a built-in plain-language flight review.
 <img width="1680" height="1050" alt="Screenshot 2026-05-11 at 7 51 35 PM" src="https://github.com/user-attachments/assets/22410de2-367c-409d-ac32-daa3e1cc11ea" />
