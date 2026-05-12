@@ -1258,9 +1258,11 @@ MAP_HTML_TEMPLATE = """<!DOCTYPE html>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const TRACK = __TRACK__;
-const COORDS = TRACK.coords || [];
-const ALTS   = TRACK.alts   || [];
-const TREL   = TRACK.trel   || [];
+const COORDS = TRACK.coords    || [];
+const ALTS   = TRACK.alts      || [];
+const TREL   = TRACK.trel      || [];
+const WAYPOINTS = TRACK.waypoints || [];
+const FENCE     = TRACK.fence     || [];
 const map = L.map('map', {
   zoomControl: true,
   attributionControl: true,
@@ -1387,6 +1389,41 @@ if (COORDS.length > 1) {
     const lng = COORDS[lo][1] + (COORDS[lo+1][1] - COORDS[lo][1]) * f;
     flightMarker.setLatLng([lat, lng]).addTo(map);
   };
+
+  // ---- Geofence polygon ----
+  if (FENCE && FENCE.length >= 3) {
+    const poly = L.polygon(FENCE, {
+      color:'#fbbf24', weight:2, opacity:0.9,
+      fillColor:'#fbbf24', fillOpacity:0.08, dashArray:'6,6'
+    }).addTo(map);
+    poly.bindTooltip('Geofence', {sticky:true});
+  }
+  // ---- Mission waypoints ----
+  if (WAYPOINTS && WAYPOINTS.length) {
+    const wpLatLngs = WAYPOINTS.map(w => [w.lat, w.lng]);
+    L.polyline(wpLatLngs, {color:'#a78bfa', weight:2, opacity:0.7,
+                           dashArray:'8,6'}).addTo(map);
+    WAYPOINTS.forEach((w, i) => {
+      const m = L.circleMarker([w.lat, w.lng], {
+        radius:9, color:'#0b1220', fillColor:'#a78bfa',
+        fillOpacity:1, weight:2
+      }).addTo(map);
+      const lbl = L.divIcon({
+        className:'',
+        html:'<div style="font-family:Inter,sans-serif;font-size:10px;'
+            +'font-weight:700;color:#a78bfa;text-shadow:0 0 4px #0b1220,0 0 4px #0b1220">'
+            + (i + 1) + '</div>',
+        iconSize:[12,12], iconAnchor:[6,6]
+      });
+      L.marker([w.lat, w.lng], {icon:lbl, interactive:false}).addTo(map);
+      m.bindTooltip(
+        'WP ' + (i + 1) + ' / ' + (w.tot || WAYPOINTS.length)
+        + (w.alt ? '<br>alt: ' + w.alt.toFixed(1) + ' m' : '')
+        + (w.id  ? '<br>cmd: ' + w.id : ''),
+        {direction:'top'}
+      );
+    });
+  }
 
   const bounds = allTrack.getBounds().pad(0.3);
   map.fitBounds(bounds, {padding:[30,30], maxZoom: 19});
@@ -1827,13 +1864,15 @@ def auto_review(parsed: dict) -> list[dict]:
         worst = max(incidents, key=lambda x: x["severity"])
         sev_label = {1: "Marginal", 2: "Marginal", 3: "Bad"}[worst["severity"]]
         sev_color = {1: "#fbbf24", 2: "#fbbf24", 3: DANGER}[worst["severity"]]
-        bullets = []
-        for ev in incidents[:8]:
-            bullets.append(f"{fmt_istanbul(ev['t'])}  {ev['title']} — {ev['detail']}")
-        more = f"  (+{len(incidents)-8} more)" if len(incidents) > 8 else ""
-        add("Incidents detected", sev_label, sev_color,
-            f"{len(incidents)} notable event(s) detected.",
-            "\n".join(bullets) + more)
+        # Attach the raw list so the UI can render clickable rows
+        items.append({
+            "category": "Incidents detected",
+            "verdict": sev_label, "color": sev_color,
+            "headline": f"{len(incidents)} notable event(s) detected. Click any row below to jump to that moment on the PLOT tab.",
+            "detail": "",
+            "tip": TIPS.get("Incidents detected", ""),
+            "events": incidents,
+        })
 
     if not items:
         add("No data", "Info", TEXT_DIM,
@@ -2095,6 +2134,20 @@ class CrosshairPlot(pg.PlotWidget):
         self.addItem(self.vline, ignoreBounds=True)
         self.vline.hide()
         self.scene().sigMouseMoved.connect(self._on_mouse)
+        # Right-click → emit signal with the x position of the click
+        self.scene().sigMouseClicked.connect(self._on_click)
+        self._last_mouse_x = 0.0
+        self.annotation_requested = None  # callback(x_relative_seconds)
+
+    def _on_click(self, ev):
+        try:
+            from PyQt6.QtCore import Qt as _Qt
+            if ev.button() == _Qt.MouseButton.RightButton and callable(self.annotation_requested):
+                view_pos = self.plotItem.vb.mapSceneToView(ev.scenePos())
+                self.annotation_requested(float(view_pos.x()))
+                ev.accept()
+        except Exception:
+            pass
 
     def set_t_start(self, t_start: float):
         self._t_start = float(t_start)
@@ -2105,6 +2158,7 @@ class CrosshairPlot(pg.PlotWidget):
             return
         view = self.plotItem.vb.mapSceneToView(pos)
         x, y = view.x(), view.y()
+        self._last_mouse_x = float(x)
         self.vline.setPos(x)
         self.vline.show()
         # x is relative seconds — add t_start for wall-clock display
@@ -2193,6 +2247,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.comparison: dict | None = None
         self.comparison_curves: dict[tuple[str, str], pg.PlotDataItem] = {}
         self._cmp_worker: LogParseWorker | None = None
+        self.annotations: list[dict] = []
+        self._annotation_items: list = []
 
         self._build_menu()
         self._build_ui()
@@ -2218,6 +2274,112 @@ class MainWindow(QtWidgets.QMainWindow):
         tab_idx = self.config.get("last_tab")
         if isinstance(tab_idx, int) and 0 <= tab_idx < self.tabs.count():
             self.tabs.setCurrentIndex(tab_idx)
+
+    # ----- Plot annotations (right-click on plot) -----
+    def _on_annotation_request(self, x_rel: float):
+        text, ok = QtWidgets.QInputDialog.getText(
+            self, "Add annotation",
+            f"Label for {fmt_istanbul((self.parsed.get('t_start') or 0) + x_rel) if self.parsed else f'{x_rel:.1f}s'}:")
+        if not ok or not text.strip():
+            return
+        self.annotations.append({"x": float(x_rel), "label": text.strip()})
+        self._save_annotations_for_current_log()
+        self._render_annotations()
+
+    def _render_annotations(self):
+        # Remove any prior annotation items
+        for it in getattr(self, "_annotation_items", []):
+            try: self.plot.removeItem(it)
+            except Exception: pass
+        self._annotation_items = []
+        for a in self.annotations:
+            line = pg.InfiniteLine(
+                pos=a["x"], angle=90, movable=False,
+                pen=pg.mkPen(ACCENT_2, width=1.2, style=Qt.PenStyle.DashLine),
+                label=a["label"],
+                labelOpts={"position": 0.05, "color": ACCENT_2,
+                           "fill": pg.mkBrush(BG_2), "movable": False},
+            )
+            self.plot.addItem(line, ignoreBounds=True)
+            self._annotation_items.append(line)
+
+    def _annotations_key(self) -> str | None:
+        if self.parsed is None:
+            return None
+        return str(Path(self.parsed["path"]).resolve())
+
+    def _load_annotations_for_current_log(self):
+        self.annotations = []
+        key = self._annotations_key()
+        if not key:
+            return
+        store = self.config.get("annotations", {})
+        items = store.get(key, [])
+        if isinstance(items, list):
+            self.annotations = [a for a in items if isinstance(a, dict)
+                                and "x" in a and "label" in a]
+
+    def _save_annotations_for_current_log(self):
+        key = self._annotations_key()
+        if not key:
+            return
+        store = self.config.setdefault("annotations", {})
+        store[key] = self.annotations
+        # Cap at 200 most-recent annotated logs in the config
+        if len(store) > 200:
+            for k in list(store.keys())[:-200]:
+                store.pop(k, None)
+        self._save_config()
+
+    def clear_annotations(self):
+        if not self.annotations:
+            return
+        if QtWidgets.QMessageBox.question(
+            self, "Clear annotations",
+            f"Remove all {len(self.annotations)} annotation(s) for this log?",
+        ) != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+        self.annotations = []
+        self._save_annotations_for_current_log()
+        self._render_annotations()
+
+    # ----- Jump-to-time (incident click) -----
+    def _jump_to_time(self, unix_t: float):
+        if self.parsed is None:
+            return
+        t_start = self.parsed.get("t_start") or 0.0
+        rel = float(unix_t) - t_start
+        # Switch to the PLOT tab
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i).strip().upper() == "PLOT":
+                self.tabs.setCurrentIndex(i)
+                break
+        # Zoom the plot to ±10s around the event
+        try:
+            self.plot.setXRange(rel - 10, rel + 10, padding=0)
+        except Exception:
+            pass
+        # Drop a vertical marker line at the event
+        if not hasattr(self, "_incident_marker"):
+            self._incident_marker = None
+        if self._incident_marker is not None:
+            try: self.plot.removeItem(self._incident_marker)
+            except Exception: pass
+        self._incident_marker = pg.InfiniteLine(
+            pos=rel, angle=90,
+            pen=pg.mkPen("#f87171", width=2, style=Qt.PenStyle.DashLine),
+            label="incident",
+            labelOpts={"position": 0.95, "color": "#f87171", "fill": pg.mkBrush(BG_2)},
+        )
+        self.plot.addItem(self._incident_marker, ignoreBounds=True)
+        self.statusBar().showMessage(
+            f"Jumped to {fmt_istanbul(unix_t, with_date=True)} {TZ_LABEL}")
+        # Also tell the master timeline so the other tabs follow
+        try:
+            self.master_t = max(0.0, min(rel, float(self.parsed.get("duration", 0))))
+            self._master_push()
+        except Exception:
+            pass
 
     # ----- Preferences -----
     def open_preferences(self):
@@ -2312,6 +2474,9 @@ class MainWindow(QtWidgets.QMainWindow):
         csv_act = QtGui.QAction("Export plotted &series to CSV…", self)
         csv_act.triggered.connect(self.export_plot_csv)
         file_menu.addAction(csv_act)
+        png_act = QtGui.QAction("Save plot as &image (PNG)…", self)
+        png_act.triggered.connect(self.export_plot_png)
+        file_menu.addAction(png_act)
 
         file_menu.addSeparator()
         quit_act = QtGui.QAction("&Quit", self)
@@ -2323,6 +2488,10 @@ class MainWindow(QtWidgets.QMainWindow):
         clear_act = QtGui.QAction("Clear plot", self)
         clear_act.triggered.connect(self.clear_plot)
         view_menu.addAction(clear_act)
+
+        clear_ann_act = QtGui.QAction("Clear &annotations on this log", self)
+        clear_ann_act.triggered.connect(self.clear_annotations)
+        view_menu.addAction(clear_ann_act)
 
         view_menu.addSeparator()
         prefs_act = QtGui.QAction("&Preferences…", self)
@@ -2409,13 +2578,18 @@ class MainWindow(QtWidgets.QMainWindow):
                 self, "No base log",
                 "Load a primary log first, then add a comparison.")
             return
-        start_dir = str(Path(__file__).parent)
+        start_dir = self.config.get("last_open_dir") or str(Path(__file__).parent)
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Open comparison log", start_dir,
-            "Flight logs (*.bin *.BIN *.tlog *.TLOG *.log);;All files (*)"
+            "All files (*);;Flight logs (*.bin *.tlog *.log)"
         )
         if not path:
             return
+        try:
+            self.config["last_open_dir"] = str(Path(path).parent)
+            self._save_config()
+        except Exception:
+            pass
         if hasattr(self, "_cmp_worker") and self._cmp_worker and self._cmp_worker.isRunning():
             return
         self.statusBar().showMessage(f"Parsing comparison {Path(path).name}…")
@@ -2670,6 +2844,32 @@ class MainWindow(QtWidgets.QMainWindow):
             rows.append("</table>")
         rows.append("<div class='footer'>UAV LOG VIEWER  ·  CREATED BY JAVID</div>")
         return f"<html><head><style>{css}</style></head><body>" + "".join(rows) + "</body></html>"
+
+    # ----- PNG export of the plot -----
+    def export_plot_png(self):
+        if not self.curves:
+            QtWidgets.QMessageBox.information(
+                self, "Nothing to export",
+                "Tick some fields on the PLOT tab first so there's something to render.")
+            return
+        suggested = "flight_plot.png"
+        if self.parsed is not None:
+            suggested = Path(self.parsed["path"]).with_suffix(".png").name
+        out, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save plot as PNG", suggested, "PNG image (*.png)")
+        if not out:
+            return
+        if not out.lower().endswith(".png"):
+            out += ".png"
+        try:
+            from pyqtgraph.exporters import ImageExporter
+            exporter = ImageExporter(self.plot.plotItem)
+            # Export at a generous fixed width for crisp images
+            exporter.parameters()["width"] = 1800
+            exporter.export(out)
+            self.statusBar().showMessage(f"Plot saved → {out}")
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "PNG export failed", str(exc))
 
     # ----- CSV export of plotted curves -----
     def export_plot_csv(self):
@@ -2943,6 +3143,7 @@ class MainWindow(QtWidgets.QMainWindow):
             f"font-family: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace; font-size:11px;"
         )
         self.plot = CrosshairPlot(self.cursor_label)
+        self.plot.annotation_requested = self._on_annotation_request
         # Performance: only render the visible window, and downsample with
         # peak-preserving mode so dense curves don't drown the GPU/CPU.
         # Without these, a single 3,500-point antialiased curve can take
@@ -3011,6 +3212,38 @@ class MainWindow(QtWidgets.QMainWindow):
                 a.setTextPen(pg.mkPen(TEXT_DIM))
             self.fft_plots.append(p)
             fft_layout.addWidget(p, 1)
+
+        # ---- Spectrogram (FFT over time) under the three spectra ----
+        spec_header = QtWidgets.QLabel("SPECTROGRAM · FFT MAGNITUDE OVER TIME (PRIMARY IMU, |AccX|+|AccY|+|AccZ|)")
+        spec_header.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-weight:700;"
+            f"letter-spacing:2px; padding:10px 6px 2px;"
+        )
+        fft_layout.addWidget(spec_header)
+        self.spectrogram_plot = pg.PlotWidget()
+        self.spectrogram_plot.setBackground(BG_1)
+        self.spectrogram_plot.setLabel("bottom", "Time", color=TEXT_DIM)
+        self.spectrogram_plot.setLabel("left", "Frequency (Hz)", color=TEXT_DIM)
+        for ax in ("left", "bottom"):
+            a = self.spectrogram_plot.getAxis(ax)
+            a.setPen(pg.mkPen(BORDER))
+            a.setTextPen(pg.mkPen(TEXT_DIM))
+        self.spectrogram_image = pg.ImageItem()
+        # Custom colormap: dark navy → cyan → violet → amber (matches app palette)
+        cmap_stops = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+        cmap_colors = np.array([
+            [11,  18,  32,  255],   # BG_0 (dark navy)
+            [34,  211, 238, 255],   # cyan
+            [167, 139, 250, 255],   # violet
+            [251, 191, 36,  255],   # amber
+            [248, 113, 113, 255],   # red
+        ], dtype=np.uint8)
+        self.spectrogram_image.setLookupTable(
+            pg.ColorMap(cmap_stops, cmap_colors).getLookupTable(0, 1, 256)
+        )
+        self.spectrogram_plot.addItem(self.spectrogram_image)
+        fft_layout.addWidget(self.spectrogram_plot, 2)
+
         self.tabs.addTab(fft_container, "  FFT  ")
 
         # PID tuning helper — desired vs actual Roll/Pitch/Yaw
@@ -3085,13 +3318,30 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ----- File loading -----
     def open_file(self):
-        start_dir = str(Path(__file__).parent)
+        # Start in: (1) last-used folder, (2) most recent log's folder,
+        # (3) ~/Desktop, (4) ~/Downloads, (5) the app's own folder
+        start_dir = self.config.get("last_open_dir")
+        if not start_dir or not Path(start_dir).is_dir():
+            if self.recent_files:
+                start_dir = str(Path(self.recent_files[0]).parent)
+            else:
+                for cand in (Path.home() / "Desktop", Path.home() / "Downloads",
+                             Path(__file__).parent):
+                    if cand.is_dir():
+                        start_dir = str(cand); break
+        # Permissive filter — All files first so nothing is greyed out
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open flight log", start_dir,
-            "Flight logs (*.bin *.BIN *.tlog *.TLOG *.log);;DataFlash binary (*.bin);;MAVLink telemetry (*.tlog);;All files (*)"
+            self, "Open flight log", start_dir or "",
+            "All files (*);;Flight logs (*.bin *.tlog *.log)"
         )
         if not path:
             return
+        # Remember the folder for next time
+        try:
+            self.config["last_open_dir"] = str(Path(path).parent)
+            self._save_config()
+        except Exception:
+            pass
         self.load_file(path)
 
     def load_file(self, path: str):
@@ -3160,6 +3410,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_fft()
         self._populate_pid()
         self._populate_review()
+        # Restore any saved right-click annotations for this log
+        self._load_annotations_for_current_log()
+        self._render_annotations()
 
     # ----- Tree -----
     def _populate_tree(self):
@@ -3487,6 +3740,30 @@ class MainWindow(QtWidgets.QMainWindow):
                 det.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px; padding-top:2px;")
                 v.addWidget(det)
 
+            # Clickable incident rows — jump to PLOT at that moment
+            events = it.get("events")
+            if events:
+                for ev in events[:20]:
+                    row = QtWidgets.QPushButton(
+                        f"  {fmt_istanbul(ev['t'])}   ◆   {ev['title']}   ·   {ev['detail']}"
+                    )
+                    row.setCursor(Qt.CursorShape.PointingHandCursor)
+                    row.setStyleSheet(
+                        f"QPushButton {{ background:{BG_1}; color:{TEXT};"
+                        f" border:1px solid {BORDER}; border-left:3px solid {it['color']};"
+                        f" border-radius:5px; padding:6px 10px; text-align:left;"
+                        f" font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
+                        f" font-size:11px; margin-top:4px; }}"
+                        f"QPushButton:hover {{ background:{BG_3}; border-color:{it['color']}; color:{ACCENT}; }}"
+                    )
+                    row.clicked.connect(
+                        lambda checked=False, t=float(ev["t"]): self._jump_to_time(t))
+                    v.addWidget(row)
+                if len(events) > 20:
+                    more = QtWidgets.QLabel(f"  (+{len(events) - 20} more)")
+                    more.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px; padding-top:4px;")
+                    v.addWidget(more)
+
             self.review_layout.addWidget(card)
 
         self.review_layout.addStretch(1)
@@ -3741,6 +4018,56 @@ class MainWindow(QtWidgets.QMainWindow):
                         plot.addItem(line, ignoreBounds=True)
             plot.setXRange(0, fs_primary / 2)
 
+        # ---- Spectrogram: sliding-window FFT of |Acc| magnitude ----
+        try:
+            primary = imus[0]
+            block_imu = primary[1]
+            ts_imu = primary[2]
+            ax_x = np.asarray(block_imu.get("AccX", []), dtype=float)
+            ax_y = np.asarray(block_imu.get("AccY", []), dtype=float)
+            ax_z = np.asarray(block_imu.get("AccZ", []), dtype=float)
+            min_len = min(len(ax_x), len(ax_y), len(ax_z), len(ts_imu))
+            if min_len > 1024:
+                mag = np.sqrt(
+                    ax_x[:min_len]**2 + ax_y[:min_len]**2 + ax_z[:min_len]**2
+                )
+                mag = mag - np.mean(mag)
+                # Sliding FFT — window length ~1 second, 50% overlap
+                win_len = int(min(2048, max(256, fs_primary)))
+                hop = max(1, win_len // 2)
+                hann = np.hanning(win_len)
+                n_frames = max(1, (min_len - win_len) // hop + 1)
+                n_bins = win_len // 2 + 1
+                spec = np.zeros((n_frames, n_bins), dtype=np.float32)
+                for fi in range(n_frames):
+                    start = fi * hop
+                    seg = mag[start:start + win_len] * hann
+                    spec[fi] = np.abs(np.fft.rfft(seg)) * (2.0 / np.sum(hann))
+                # dB scale, clipped
+                spec_db = 20 * np.log10(spec + 1e-6)
+                # Limit to Nyquist
+                # spec_db shape: (frames, bins); X=time, Y=freq
+                t0 = float(ts_imu[0]) - (self.parsed.get("t_start") or 0.0)
+                t1 = float(ts_imu[min_len-1]) - (self.parsed.get("t_start") or 0.0)
+                freq_max = fs_primary / 2
+                self.spectrogram_image.setImage(spec_db, autoLevels=True)
+                self.spectrogram_image.setRect(QtCore.QRectF(
+                    t0, 0, max(0.001, t1 - t0), freq_max
+                ))
+                # Make the time axis show Istanbul wall-clock via IstanbulTimeAxis
+                old_axis = self.spectrogram_plot.getAxis("bottom")
+                if not isinstance(old_axis, IstanbulTimeAxis):
+                    new_axis = IstanbulTimeAxis(orientation="bottom")
+                    self.spectrogram_plot.setAxisItems({"bottom": new_axis})
+                    new_axis.setPen(pg.mkPen(BORDER))
+                    new_axis.setTextPen(pg.mkPen(TEXT_DIM))
+                self.spectrogram_plot.getAxis("bottom").set_t_start(
+                    self.parsed.get("t_start") or 0.0)
+                self.spectrogram_plot.setXRange(t0, t1)
+                self.spectrogram_plot.setYRange(0, freq_max)
+        except Exception:
+            pass
+
     # ----- PID tuning tab -----
     def _populate_pid(self):
         for p in self.pid_plots:
@@ -3844,10 +4171,62 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         return {"coords": [], "alts": [], "trel": []}
 
+    def _extract_mission_and_fence(self) -> dict:
+        """Return planned mission waypoints + geofence polygon if present."""
+        if self.parsed is None:
+            return {"waypoints": [], "fence": []}
+        d = self.parsed["data"]
+        wps: list[dict] = []
+        # CMD message holds the planned mission (one row per waypoint).
+        # Field names vary slightly between firmware versions; handle both.
+        cmd = d.get("CMD")
+        if cmd:
+            lat_key = next((k for k in ("Lat", "lat") if k in cmd), None)
+            lng_key = next((k for k in ("Lng", "Lon", "lng", "lon") if k in cmd), None)
+            alt_key = next((k for k in ("Alt", "alt") if k in cmd), None)
+            cnum_key = next((k for k in ("CNum", "WPNum", "Num") if k in cmd), None)
+            ctot_key = next((k for k in ("CTot", "WPTot") if k in cmd), None)
+            cid_key = next((k for k in ("CId", "Id") if k in cmd), None)
+            if lat_key and lng_key:
+                lats = np.asarray(cmd[lat_key], dtype=float)
+                lngs = np.asarray(cmd[lng_key], dtype=float)
+                if len(lats) and np.nanmax(np.abs(lats)) > 200:
+                    lats = lats / 1e7; lngs = lngs / 1e7
+                for i in range(len(lats)):
+                    la, lo = float(lats[i]), float(lngs[i])
+                    if abs(la) < 0.0001 and abs(lo) < 0.0001:
+                        continue
+                    wps.append({
+                        "lat": la, "lng": lo,
+                        "alt": float(cmd[alt_key][i]) if alt_key and i < len(cmd[alt_key]) else 0.0,
+                        "n":   int(cmd[cnum_key][i]) if cnum_key and i < len(cmd[cnum_key]) else (i + 1),
+                        "tot": int(cmd[ctot_key][i]) if ctot_key and i < len(cmd[ctot_key]) else 0,
+                        "id":  int(cmd[cid_key][i])  if cid_key  and i < len(cmd[cid_key])  else 0,
+                    })
+
+        # FENCE polygon — points are stored across multiple rows
+        fence: list[list[float]] = []
+        f = d.get("FNCE") or d.get("FENC") or d.get("FENCE")
+        if f:
+            lat_key = next((k for k in ("Lat", "lat") if k in f), None)
+            lng_key = next((k for k in ("Lng", "Lon", "lng", "lon") if k in f), None)
+            if lat_key and lng_key:
+                lats = np.asarray(f[lat_key], dtype=float)
+                lngs = np.asarray(f[lng_key], dtype=float)
+                if len(lats) and np.nanmax(np.abs(lats)) > 200:
+                    lats = lats / 1e7; lngs = lngs / 1e7
+                for la, lo in zip(lats, lngs):
+                    if abs(la) > 0.0001 and abs(lo) > 0.0001:
+                        fence.append([float(la), float(lo)])
+        return {"waypoints": wps, "fence": fence}
+
     def _set_map_coords(self, track):
         # Back-compat: list of [lat,lng] still works
         if isinstance(track, list):
             track = {"coords": track, "alts": []}
+        # Attach mission + fence overlays
+        extras = self._extract_mission_and_fence()
+        track = {**track, **extras}
         html = MAP_HTML_TEMPLATE.replace("__TRACK__", json.dumps(track))
         # setHtml with a real https base URL — lets QtWebEngine load https
         # scripts (Leaflet from unpkg) and tiles (Esri/CARTO) without the
