@@ -100,15 +100,6 @@ The map and 3D views need an internet connection (they pull tile imagery from Op
 
 ---
 
-## Why this exists
-
-Most web-based ArduPilot log viewers are great for quick checks, but:
-- It runs in the browser — no native window, no offline use.
-- It shows you *the data*, not *what the data means*.
-- New pilots staring at vibration plots don't know if `25 m/s²` is good or bad.
-
-This tool fixes both: it's a real desktop app, and the **Auto Review** tab translates raw telemetry into sentences any pilot can act on
-
 
 ## Tech stack
 
