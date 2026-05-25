@@ -2,14 +2,41 @@
 // SVG instrument panel — attitude indicator, HSI, altitude tape, airspeed
 // tape. The "time" slider lets you scrub through the log; values update
 // reactively.
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps({ parsed: Object })
 
 const t = ref(0)            // seconds since log start
 const duration = computed(() => props.parsed?.duration || 0)
+const playing = ref(false)
+const speed = ref(1)
+let raf = null
+let lastTick = 0
 
 watch(() => props.parsed, () => { t.value = duration.value })
+
+function tick(now) {
+  if (!playing.value) return
+  if (!lastTick) lastTick = now
+  const dt = (now - lastTick) / 1000
+  lastTick = now
+  t.value = Math.min(duration.value, t.value + dt * speed.value)
+  if (t.value >= duration.value) { playing.value = false; raf = null; return }
+  raf = requestAnimationFrame(tick)
+}
+function play() {
+  if (playing.value) return
+  if (t.value >= duration.value) t.value = 0
+  playing.value = true
+  lastTick = 0
+  raf = requestAnimationFrame(tick)
+}
+function pause() {
+  playing.value = false
+  if (raf) cancelAnimationFrame(raf); raf = null
+}
+function reset() { pause(); t.value = 0 }
+onBeforeUnmount(() => { if (raf) cancelAnimationFrame(raf) })
 
 // Helper: nearest-index sampler for a (times, values) pair
 function sampleAt(timesArr, valuesArr, tSec) {
@@ -179,10 +206,21 @@ function fmtNum(v, d = 1) { return v == null ? '—' : v.toFixed(d) }
       </div>
     </div>
 
-    <!-- Scrubber -->
+    <!-- Scrubber + transport controls -->
     <div class="scrub">
-      <button class="step" @click="t = 0">⏮</button>
-      <input type="range" min="0" :max="duration" step="0.1" v-model.number="t" class="slider"/>
+      <button class="step" @click="reset" title="Reset to start">⏮</button>
+      <button class="step play" @click="playing ? pause() : play()">
+        {{ playing ? '❚❚ PAUSE' : '▶ PLAY' }}
+      </button>
+      <div class="speed-group">
+        <button v-for="s in [0.5, 1, 2, 4, 8]" :key="s"
+                class="speed-btn"
+                :class="{ active: speed === s }"
+                @click="speed = s">{{ s }}×</button>
+      </div>
+      <input type="range" min="0" :max="duration" step="0.05"
+             v-model.number="t" class="slider"
+             @mousedown="pause"/>
       <div class="time mono">T+{{ t.toFixed(1) }}s / {{ duration.toFixed(1) }}s</div>
     </div>
   </div>
@@ -234,11 +272,33 @@ function fmtNum(v, d = 1) { return v == null ? '—' : v.toFixed(d) }
   background: var(--bg-2);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
   cursor: pointer;
 }
 .scrub .step:hover { color: var(--accent); border-color: var(--accent); }
+.scrub .play {
+  background: var(--accent);
+  color: var(--bg-0);
+  border-color: var(--accent);
+  font-weight: 700;
+  min-width: 88px;
+}
+.scrub .play:hover { background: var(--accent-2); border-color: var(--accent-2); color: var(--bg-0); }
+.speed-group { display: flex; gap: 2px; background: var(--bg-2); border: 1px solid var(--border); padding: 2px; }
+.speed-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+.speed-btn:hover { color: var(--text); }
+.speed-btn.active { background: var(--accent); color: var(--bg-0); font-weight: 700; }
 .scrub .slider {
   flex: 1;
   -webkit-appearance: none; appearance: none;

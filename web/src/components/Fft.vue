@@ -78,6 +78,8 @@ function pickImu(parsed) {
 // Check what's available in the log up-front. This runs even if the
 // canvases aren't laid out yet, so the banner shows a useful diagnostic.
 function checkData() {
+  imuSource.value = null
+  fs.value = null
   const { name, imu, times: t } = pickImu(props.parsed)
   if (!imu || !t?.length) {
     const allTypes = Object.keys(props.parsed?.data || {})
@@ -89,6 +91,12 @@ function checkData() {
     return null
   }
   imuSource.value = name
+  // Detect sample rate up-front so the banner can show it even before
+  // the canvas is mounted / sized.
+  const dts = []
+  for (let i = 1; i < Math.min(200, t.length); i++) dts.push(t[i] - t[i - 1])
+  const dt = median(dts)
+  fs.value = (dt && dt > 0) ? 1 / dt : null
   return { imu, t }
 }
 
