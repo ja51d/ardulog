@@ -113,11 +113,11 @@ pg.setConfigOption("foreground", TEXT)
 pg.setConfigOptions(antialias=False)
 
 PLOT_COLORS = [
-    "#22d3ee",  # cyan
-    "#a78bfa",  # violet
-    "#34d399",  # green
+    "#4a90e2",  # cyan
+    "#6aa9e8",  # violet
+    "#5dba7c",  # green
     WARN,  # amber
-    "#f87171",  # red
+    "#d96666",  # red
     "#60a5fa",  # blue
     "#f472b6",  # pink
     "#facc15",  # yellow
@@ -378,19 +378,19 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="utf-8" />
 <title>Instruments</title>
 <style>
-  html,body{height:100%;margin:0;padding:0;background:#0b1220;
+  html,body{height:100%;margin:0;padding:0;background:#1a1f29;
             font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;
-            color:#e6edf7;overflow:hidden;user-select:none}
+            color:#cdd6e0;overflow:hidden;user-select:none}
   .empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-         padding:18px 24px;background:#111a2e;border:1px solid #243154;
-         color:#8b97b3;border-radius:8px;text-align:center}
+         padding:18px 24px;background:#20262f;border:1px solid #323a47;
+         color:#7a8699;border-radius:8px;text-align:center}
   #wrap{height:100vh;display:flex;flex-direction:column;padding:14px;gap:12px;box-sizing:border-box}
   .row{display:grid;gap:14px;min-height:0}
   #row-instruments{grid-template-columns:repeat(4,1fr);flex:1 1 280px}
   #row-sticks{flex:0 0 220px}
   #ctrl{flex:0 0 auto}
   .panel{background:
-           radial-gradient(circle at 50% 0%, rgba(34,211,238,0.06) 0%, rgba(0,0,0,0) 60%),
+           radial-gradient(circle at 50% 0%, rgba(74,144,226,0.06) 0%, rgba(0,0,0,0) 60%),
            linear-gradient(180deg,#1a2740 0%,#0e172a 100%);
          border:1px solid #2a3a5a; border-radius:14px;
          padding:14px 14px 12px; display:flex; flex-direction:column;
@@ -398,7 +398,7 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
          box-shadow: 0 8px 24px rgba(0,0,0,0.45),
                      inset 0 1px 0 rgba(255,255,255,0.05),
                      inset 0 0 0 1px rgba(34,211,238,0.05)}
-  .panel h3{margin:0 0 10px; color:#8b97b3; font-size:10px; letter-spacing:3px;
+  .panel h3{margin:0 0 10px; color:#7a8699; font-size:10px; letter-spacing:3px;
             font-weight:800; text-align:center;
             padding-bottom:6px; width:100%;
             border-bottom: 1px solid rgba(34,211,238,0.18)}
@@ -407,7 +407,7 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
            background:rgba(11,18,32,0.7); border:1px solid rgba(34,211,238,0.2);
            border-radius:6px;
            font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
-           color:#22d3ee; font-size:13px; font-weight:700; letter-spacing:1.2px;
+           color:#4a90e2; font-size:13px; font-weight:700; letter-spacing:1.2px;
            text-align:center; white-space:nowrap;
            text-shadow:0 0 8px rgba(34,211,238,0.4)}
   .readout .dim{color:#5b7196; font-weight:600; letter-spacing:1.5px; font-size:10px;
@@ -435,43 +435,43 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
   .gimbal-wrap svg{flex:1;min-height:0;width:100%;max-width:220px}
   .gimbal-label{font-size:9px;letter-spacing:3px;font-weight:800;color:#5b7196;
                 text-align:center;text-transform:uppercase;margin-top:2px}
-  .gimbal-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;color:#22d3ee;
+  .gimbal-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;color:#4a90e2;
                   font-size:11px;font-weight:700;letter-spacing:0.5px;text-align:center;
-                  white-space:nowrap;text-shadow:0 0 6px rgba(34,211,238,0.35)}
+                  white-space:nowrap;text-shadow:0 0 6px rgba(74,144,226,0.0)}
   .gimbal-readout .dim{color:#5b7196;text-shadow:none;font-weight:600}
   /* Center spine between the two gimbals — looks like a real transmitter */
   .rc-center{display:flex;flex-direction:column;align-items:center;gap:14px;
              padding:0 8px;color:#5b7196;font-size:9px;letter-spacing:2px;
              font-weight:800;text-align:center;font-family:"Inter",sans-serif}
-  .rc-led{width:8px;height:8px;border-radius:50%;background:#22d3ee;
-          box-shadow:0 0 10px #22d3ee, 0 0 20px rgba(34,211,238,0.5)}
+  .rc-led{width:8px;height:8px;border-radius:50%;background:#4a90e2;
+          box-shadow:0 0 10px #4a90e2, 0 0 20px rgba(34,211,238,0.5)}
 
   /* Control bar — always visible at bottom */
   #ctrl{display:flex;align-items:center;gap:14px;padding:12px 18px;
-        background:#111a2e;border:1px solid #243154;border-radius:12px;
+        background:#20262f;border:1px solid #323a47;border-radius:12px;
         flex-shrink:0;flex-wrap:wrap}
-  .btn{background:#22d3ee;color:#0b1220;font-weight:800;letter-spacing:1.5px;
+  .btn{background:#4a90e2;color:#1a1f29;font-weight:800;letter-spacing:1.5px;
        font-size:11px;padding:9px 18px;border-radius:6px;cursor:pointer;
-       border:1px solid #22d3ee;font-family:inherit;transition:all 0.15s;
-       box-shadow:0 0 12px rgba(34,211,238,0.35)}
-  .btn:hover{background:#67e8f9;border-color:#67e8f9;box-shadow:0 0 18px rgba(34,211,238,0.55)}
-  .btn.alt{background:#16223c;color:#e6edf7;border-color:#243154;box-shadow:none}
-  .btn.alt:hover{background:#1d2c4d;border-color:#22d3ee;color:#22d3ee;box-shadow:0 0 12px rgba(34,211,238,0.25)}
-  .speed-group{display:flex;gap:4px;padding:3px;background:#0b1220;
-               border:1px solid #243154;border-radius:6px}
-  .speed-btn{background:transparent;color:#8b97b3;font-size:10px;font-weight:700;
+       border:1px solid #4a90e2;font-family:inherit;transition:all 0.15s;
+       box-shadow:0 0 12px rgba(74,144,226,0.0)}
+  .btn:hover{background:#6aa9e8;border-color:#6aa9e8;box-shadow:0 0 18px rgba(74,144,226,0.4)}
+  .btn.alt{background:#262d38;color:#cdd6e0;border-color:#323a47;box-shadow:none}
+  .btn.alt:hover{background:#2f3742;border-color:#4a90e2;color:#4a90e2;box-shadow:0 0 12px rgba(34,211,238,0.25)}
+  .speed-group{display:flex;gap:4px;padding:3px;background:#1a1f29;
+               border:1px solid #323a47;border-radius:6px}
+  .speed-btn{background:transparent;color:#7a8699;font-size:10px;font-weight:700;
              letter-spacing:1px;padding:6px 10px;border:none;border-radius:4px;
              cursor:pointer;font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
              transition:all 0.15s}
-  .speed-btn:hover{color:#22d3ee;background:#16223c}
-  .speed-btn.active{background:#22d3ee;color:#0b1220}
-  #scrub{flex:1;-webkit-appearance:none;height:6px;background:#243154;
+  .speed-btn:hover{color:#4a90e2;background:#262d38}
+  .speed-btn.active{background:#4a90e2;color:#1a1f29}
+  #scrub{flex:1;-webkit-appearance:none;height:6px;background:#323a47;
          border-radius:3px;outline:none;cursor:pointer}
   #scrub::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
-         background:#22d3ee;border-radius:50%;border:2px solid #0b1220;cursor:pointer;
-         box-shadow:0 0 10px rgba(34,211,238,0.7)}
+         background:#4a90e2;border-radius:50%;border:2px solid #1a1f29;cursor:pointer;
+         box-shadow:0 0 10px rgba(74,144,226,0.0)}
   #time-readout{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
-         color:#22d3ee;font-size:14px;font-weight:700;letter-spacing:1px;min-width:160px;text-align:right}
+         color:#4a90e2;font-size:14px;font-weight:700;letter-spacing:1px;min-width:160px;text-align:right}
   .ai-bg{fill:#06101e}
   .ai-sky{fill:#1e3a8a}        /* deeper sky */
   .ai-ground{fill:#7c2d12}     /* richer brown */
@@ -483,27 +483,27 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
   .ai-roll-tick{stroke:#ffffff;stroke-width:1.2}
   .ai-roll-pointer{fill:#d9a14a}
   .hsi-card{fill:#06101e;stroke:#2a3a5a;stroke-width:2}
-  .hsi-tick{stroke:#e6edf7;stroke-width:1.2;stroke-linecap:round}
-  .hsi-cardinal{fill:#22d3ee;font-size:15px;font-weight:900;font-family:"Inter",sans-serif;text-anchor:middle}
-  .hsi-deg{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;text-anchor:middle}
+  .hsi-tick{stroke:#cdd6e0;stroke-width:1.2;stroke-linecap:round}
+  .hsi-cardinal{fill:#4a90e2;font-size:15px;font-weight:900;font-family:"Inter",sans-serif;text-anchor:middle}
+  .hsi-deg{fill:#7a8699;font-size:8px;font-family:"JetBrains Mono",monospace;text-anchor:middle}
   .hsi-aircraft{fill:#d9a14a;stroke:#06101e;stroke-width:1}
   .tape-bg{fill:#06101e;stroke:#2a3a5a;stroke-width:1.5}
   .tape-tick{stroke:#5b7196;stroke-width:1}
-  .tape-tick-major{stroke:#e6edf7;stroke-width:1.5}
-  .tape-label{fill:#8b97b3;font-size:9px;font-family:"JetBrains Mono",monospace;font-weight:600}
-  .tape-marker{fill:#22d3ee}
-  .tape-current{fill:#22d3ee;font-size:14px;font-weight:800;font-family:"JetBrains Mono",monospace;text-anchor:middle}
+  .tape-tick-major{stroke:#cdd6e0;stroke-width:1.5}
+  .tape-label{fill:#7a8699;font-size:9px;font-family:"JetBrains Mono",monospace;font-weight:600}
+  .tape-marker{fill:#4a90e2}
+  .tape-current{fill:#4a90e2;font-size:14px;font-weight:800;font-family:"JetBrains Mono",monospace;text-anchor:middle}
   .stick-frame{fill:#06101e;stroke:#2a3a5a;stroke-width:1.5}
   .stick-cross{stroke:#2a3a5a;stroke-width:1}
-  .stick-dot{fill:#22d3ee;stroke:#06101e;stroke-width:2}
-  .stick-axis{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;font-weight:600;letter-spacing:1.5px}
+  .stick-dot{fill:#4a90e2;stroke:#06101e;stroke-width:2}
+  .stick-axis{fill:#7a8699;font-size:8px;font-family:"JetBrains Mono",monospace;font-weight:600;letter-spacing:1.5px}
 </style>
 </head><body>
 <script>
 const D = __DATA__;
 if (!D) {
   document.body.innerHTML = '<div class="empty">'
-    + '<div style="font-size:14px;color:#e6edf7;margin-bottom:4px">No instrument data</div>'
+    + '<div style="font-size:14px;color:#cdd6e0;margin-bottom:4px">No instrument data</div>'
     + '<div style="font-size:12px">This log is missing ATT or RCIN messages.</div></div>';
 } else {
   document.body.innerHTML = `
@@ -565,10 +565,10 @@ if (!D) {
           <rect class="tape-bg" x="-25" y="-90" width="50" height="180" rx="4"/>
           <g id="alt-tape"></g>
           <!-- current value box -->
-          <rect x="-26" y="-12" width="52" height="24" fill="#16223c" stroke="#22d3ee" stroke-width="1.5"/>
+          <rect x="-26" y="-12" width="52" height="24" fill="#262d38" stroke="#4a90e2" stroke-width="1.5"/>
           <text id="alt-tape-current" class="tape-current" x="0" y="4">0</text>
           <!-- center reticle -->
-          <polygon fill="#22d3ee" points="-26,-12 -26,12 -32,0"/>
+          <polygon fill="#4a90e2" points="-26,-12 -26,12 -32,0"/>
         </svg>
         <div class="readout">
           <span class="dim">ALT</span> <span id="alt-val">0.0 m</span>
@@ -580,9 +580,9 @@ if (!D) {
         <svg viewBox="-30 -100 60 200" preserveAspectRatio="xMidYMid meet">
           <rect class="tape-bg" x="-25" y="-90" width="50" height="180" rx="4"/>
           <g id="spd-tape"></g>
-          <rect x="-26" y="-12" width="52" height="24" fill="#16223c" stroke="#22d3ee" stroke-width="1.5"/>
+          <rect x="-26" y="-12" width="52" height="24" fill="#262d38" stroke="#4a90e2" stroke-width="1.5"/>
           <text id="spd-tape-current" class="tape-current" x="0" y="4">0</text>
-          <polygon fill="#22d3ee" points="-26,-12 -26,12 -32,0"/>
+          <polygon fill="#4a90e2" points="-26,-12 -26,12 -32,0"/>
         </svg>
         <div class="readout">
           <span class="dim">SPD</span> <span id="spd-val">0.0 m/s</span>
@@ -652,7 +652,7 @@ if (!D) {
         <button class="speed-btn" data-speed="8">8×</button>
       </div>
       <input type="range" id="scrub" min="0" max="${D.n-1}" value="0">
-      <div id="time-readout"><span id="t-time">--:--:--</span> <span style="color:#8b97b3">·</span> <span id="t-rel">T+0.0s</span></div>
+      <div id="time-readout"><span id="t-time">--:--:--</span> <span style="color:#7a8699">·</span> <span id="t-rel">T+0.0s</span></div>
     </div>
   </div>`;
 
@@ -859,42 +859,42 @@ PLOT3D_HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="utf-8" />
 <title>3D Track</title>
 <style>
-  html,body{height:100%;margin:0;padding:0;background:#0b1220;
-            font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;color:#e6edf7;overflow:hidden}
+  html,body{height:100%;margin:0;padding:0;background:#1a1f29;
+            font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;color:#cdd6e0;overflow:hidden}
   #app{height:100vh;display:flex;flex-direction:column}
   #plot{flex:1;min-height:0;width:100%}
   #ctrl3d{display:flex;align-items:center;gap:14px;padding:10px 14px;
-          background:#111a2e;border-top:1px solid #243154;flex-shrink:0}
-  #ctrl3d .btn{background:#22d3ee;color:#0b1220;font-weight:800;letter-spacing:1.5px;
+          background:#20262f;border-top:1px solid #323a47;flex-shrink:0}
+  #ctrl3d .btn{background:#4a90e2;color:#1a1f29;font-weight:800;letter-spacing:1.5px;
        font-size:11px;padding:8px 16px;border-radius:6px;cursor:pointer;
-       border:1px solid #22d3ee;font-family:inherit;transition:all 0.15s;
-       box-shadow:0 0 12px rgba(34,211,238,0.35)}
-  #ctrl3d .btn:hover{background:#67e8f9;border-color:#67e8f9}
-  #ctrl3d .btn.alt{background:#16223c;color:#e6edf7;border-color:#243154;box-shadow:none}
-  #ctrl3d .btn.alt:hover{background:#1d2c4d;border-color:#22d3ee;color:#22d3ee}
-  #ctrl3d .speed-group{display:flex;gap:4px;padding:3px;background:#0b1220;
-               border:1px solid #243154;border-radius:6px}
-  #ctrl3d .speed-btn{background:transparent;color:#8b97b3;font-size:10px;font-weight:700;
+       border:1px solid #4a90e2;font-family:inherit;transition:all 0.15s;
+       box-shadow:0 0 12px rgba(74,144,226,0.0)}
+  #ctrl3d .btn:hover{background:#6aa9e8;border-color:#6aa9e8}
+  #ctrl3d .btn.alt{background:#262d38;color:#cdd6e0;border-color:#323a47;box-shadow:none}
+  #ctrl3d .btn.alt:hover{background:#2f3742;border-color:#4a90e2;color:#4a90e2}
+  #ctrl3d .speed-group{display:flex;gap:4px;padding:3px;background:#1a1f29;
+               border:1px solid #323a47;border-radius:6px}
+  #ctrl3d .speed-btn{background:transparent;color:#7a8699;font-size:10px;font-weight:700;
              letter-spacing:1px;padding:6px 10px;border:none;border-radius:4px;
              cursor:pointer;font-family:"JetBrains Mono","SF Mono",Menlo,monospace}
-  #ctrl3d .speed-btn:hover{color:#22d3ee;background:#16223c}
-  #ctrl3d .speed-btn.active{background:#22d3ee;color:#0b1220}
-  #ctrl3d #scrub3d{flex:1;-webkit-appearance:none;height:6px;background:#243154;
+  #ctrl3d .speed-btn:hover{color:#4a90e2;background:#262d38}
+  #ctrl3d .speed-btn.active{background:#4a90e2;color:#1a1f29}
+  #ctrl3d #scrub3d{flex:1;-webkit-appearance:none;height:6px;background:#323a47;
          border-radius:3px;outline:none;cursor:pointer}
   #ctrl3d #scrub3d::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
-         background:#22d3ee;border-radius:50%;border:2px solid #0b1220;cursor:pointer;
-         box-shadow:0 0 10px rgba(34,211,238,0.7)}
+         background:#4a90e2;border-radius:50%;border:2px solid #1a1f29;cursor:pointer;
+         box-shadow:0 0 10px rgba(74,144,226,0.0)}
   #t3d{font-family:"JetBrains Mono","SF Mono",Menlo,monospace;
-         color:#22d3ee;font-size:13px;font-weight:700;letter-spacing:1px;min-width:200px;text-align:right}
+         color:#4a90e2;font-size:13px;font-weight:700;letter-spacing:1px;min-width:200px;text-align:right}
   .empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-         padding:18px 24px;background:#111a2e;border:1px solid #243154;
-         color:#8b97b3;border-radius:8px;text-align:center}
+         padding:18px 24px;background:#20262f;border:1px solid #323a47;
+         color:#7a8699;border-radius:8px;text-align:center}
   .hud{position:absolute;top:14px;left:14px;z-index:10;
-       padding:8px 14px;background:rgba(17,26,46,0.85);
-       border:1px solid #22d3ee;border-radius:8px;
+       padding:8px 14px;background:rgba(38,45,56,0.92);
+       border:1px solid #4a90e2;border-radius:8px;
        backdrop-filter:blur(6px);font-size:11px;letter-spacing:1px;
-       color:#22d3ee;font-weight:600}
-  .hud .v{color:#e6edf7;font-weight:400;letter-spacing:0;margin-left:8px}
+       color:#4a90e2;font-weight:600}
+  .hud .v{color:#cdd6e0;font-weight:400;letter-spacing:0;margin-left:8px}
 </style>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head><body>
@@ -922,14 +922,14 @@ PLOT3D_HTML_TEMPLATE = """<!DOCTYPE html>
       <button class="speed-btn" data-speed="8">8×</button>
     </div>
     <input type="range" id="scrub3d" min="0" max="0" value="0" step="0.01">
-    <div id="t3d"><span id="t3d-time">--:--:--</span> <span style="color:#8b97b3">·</span> <span id="t3d-rel">T+0.0s</span></div>
+    <div id="t3d"><span id="t3d-time">--:--:--</span> <span style="color:#7a8699">·</span> <span id="t3d-rel">T+0.0s</span></div>
   </div>
 </div>
 <script>
 const PTS = __PTS__;
 if (!PTS || PTS.x.length < 2) {
   document.body.innerHTML = '<div class="empty">'
-    + '<div style="font-size:14px;color:#e6edf7;margin-bottom:4px">No 3D track</div>'
+    + '<div style="font-size:14px;color:#cdd6e0;margin-bottom:4px">No 3D track</div>'
     + '<div style="font-size:12px">Need at least 2 GPS/POS points with a 3D fix.</div></div>';
 } else {
   const X = PTS.x, Y = PTS.y, Z = PTS.z;
@@ -983,7 +983,7 @@ if (!PTS || PTS.x.length < 2) {
     FACE_I = [4,4,4,4,4,5,5,5,5,5];
     FACE_J = [0,6,1,3,2,6,1,3,2,0];
     FACE_K = [6,1,3,2,0,0,6,1,3,2];
-    VERT_COLORS = ['#22d3ee','#22d3ee','#a78bfa','#a78bfa','#22d3ee','#a78bfa','#d9a14a'];
+    VERT_COLORS = ['#4a90e2','#4a90e2','#6aa9e8','#6aa9e8','#4a90e2','#6aa9e8','#d9a14a'];
   }
 
   function rotatedAircraftVerts(i) {
@@ -1046,17 +1046,17 @@ if (!PTS || PTS.x.length < 2) {
     x: markerX, y: markerY, z: markerZ,
     text: markerLabels,
     textposition: 'top center',
-    textfont: { color:'#8b97b3', size:10,
+    textfont: { color:'#7a8699', size:10,
                 family:'"JetBrains Mono","SF Mono",Menlo,monospace' },
-    marker: { size:4, color:'#a78bfa', symbol:'diamond',
-              line:{color:'#0b1220', width:1} },
+    marker: { size:4, color:'#6aa9e8', symbol:'diamond',
+              line:{color:'#1a1f29', width:1} },
     name: 'distance',
     hoverinfo: 'text'
   };
   const flownTrail = {
     type:'scatter3d', mode:'lines',
     x:[X[0]], y:[Y[0]], z:[Z[0]],
-    line:{ width:6, color:'#22d3ee' },
+    line:{ width:6, color:'#4a90e2' },
     name:'flown', hoverinfo:'skip'
   };
   const initVerts = rotatedAircraftVerts(0);
@@ -1074,13 +1074,13 @@ if (!PTS || PTS.x.length < 2) {
   const startMarker = {
     type:'scatter3d', mode:'markers',
     x:[X[0]], y:[Y[0]], z:[Z[0]],
-    marker:{ size:7, color:'#34d399', line:{color:'#0b1220',width:2} },
+    marker:{ size:7, color:'#5dba7c', line:{color:'#1a1f29',width:2} },
     name:'start', hovertemplate:'START<extra></extra>'
   };
   const endMarker = {
     type:'scatter3d', mode:'markers',
     x:[X[N-1]], y:[Y[N-1]], z:[Z[N-1]],
-    marker:{ size:7, color:'#f87171', line:{color:'#0b1220',width:2} },
+    marker:{ size:7, color:'#d96666', line:{color:'#1a1f29',width:2} },
     name:'end', hovertemplate:'END<extra></extra>'
   };
 
@@ -1092,28 +1092,28 @@ if (!PTS || PTS.x.length < 2) {
   function lerp(a, b, t) { return a + (b - a) * t; }
 
   const layout = {
-    paper_bgcolor:'#0b1220',
-    plot_bgcolor:'#0b1220',
-    font:{ color:'#e6edf7', family:'"Inter","Helvetica Neue","Segoe UI",sans-serif' },
+    paper_bgcolor:'#1a1f29',
+    plot_bgcolor:'#1a1f29',
+    font:{ color:'#cdd6e0', family:'"Inter","Helvetica Neue","Segoe UI",sans-serif' },
     margin:{ l:0, r:0, t:0, b:0 },
     showlegend:true,
     scene:{
-      bgcolor:'#0b1220',
-      xaxis:{ title:{text:'EAST (m)',font:{size:10,color:'#8b97b3'}},
-              gridcolor:'#243154', zerolinecolor:'#22d3ee', color:'#8b97b3',
+      bgcolor:'#1a1f29',
+      xaxis:{ title:{text:'EAST (m)',font:{size:10,color:'#7a8699'}},
+              gridcolor:'#323a47', zerolinecolor:'#4a90e2', color:'#7a8699',
               showbackground:true, backgroundcolor:'rgba(17,26,46,0.4)' },
-      yaxis:{ title:{text:'NORTH (m)',font:{size:10,color:'#8b97b3'}},
-              gridcolor:'#243154', zerolinecolor:'#22d3ee', color:'#8b97b3',
+      yaxis:{ title:{text:'NORTH (m)',font:{size:10,color:'#7a8699'}},
+              gridcolor:'#323a47', zerolinecolor:'#4a90e2', color:'#7a8699',
               showbackground:true, backgroundcolor:'rgba(17,26,46,0.4)' },
-      zaxis:{ title:{text:'ALTITUDE (m)',font:{size:10,color:'#8b97b3'}},
-              gridcolor:'#243154', zerolinecolor:'#a78bfa', color:'#8b97b3',
+      zaxis:{ title:{text:'ALTITUDE (m)',font:{size:10,color:'#7a8699'}},
+              gridcolor:'#323a47', zerolinecolor:'#6aa9e8', color:'#7a8699',
               showbackground:true, backgroundcolor:'rgba(17,26,46,0.6)' },
       aspectmode:'data',
       camera:{ eye:{x:1.5, y:1.5, z:0.95} }
     },
-    legend:{ font:{color:'#e6edf7',size:10},
-             bgcolor:'rgba(17,26,46,0.85)',
-             bordercolor:'#22d3ee', borderwidth:1,
+    legend:{ font:{color:'#cdd6e0',size:10},
+             bgcolor:'rgba(38,45,56,0.92)',
+             bordercolor:'#4a90e2', borderwidth:1,
              x:0.85, y:0.97 },
   };
   const config = { displayModeBar:true, displaylogo:false, responsive:true,
@@ -1281,24 +1281,24 @@ MAP_HTML_TEMPLATE = """<!DOCTYPE html>
 <title>Track</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  html,body,#map{height:100%;margin:0;padding:0;background:#0b1220}
-  .leaflet-container{background:#0b1220 !important;font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif}
-  .leaflet-control-attribution{background:rgba(17,26,46,.85) !important;color:#8b97b3 !important;border:none !important}
-  .leaflet-control-attribution a{color:#22d3ee !important}
-  .leaflet-bar{border:1px solid #243154 !important;background:#16223c !important}
-  .leaflet-bar a{background:#16223c !important;color:#e6edf7 !important;border-bottom:1px solid #243154 !important}
-  .leaflet-bar a:hover{background:#1d2c4d !important;color:#22d3ee !important}
-  .leaflet-tooltip{background:#16223c;border:1px solid #22d3ee;color:#e6edf7;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-  .leaflet-tooltip-top:before{border-top-color:#22d3ee}
-  .leaflet-control-layers{background:#111a2e !important;border:1px solid #243154 !important;color:#e6edf7 !important;border-radius:6px !important;padding:4px 6px !important}
+  html,body,#map{height:100%;margin:0;padding:0;background:#1a1f29}
+  .leaflet-container{background:#1a1f29 !important;font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif}
+  .leaflet-control-attribution{background:rgba(17,26,46,.85) !important;color:#7a8699 !important;border:none !important}
+  .leaflet-control-attribution a{color:#4a90e2 !important}
+  .leaflet-bar{border:1px solid #323a47 !important;background:#262d38 !important}
+  .leaflet-bar a{background:#262d38 !important;color:#cdd6e0 !important;border-bottom:1px solid #323a47 !important}
+  .leaflet-bar a:hover{background:#2f3742 !important;color:#4a90e2 !important}
+  .leaflet-tooltip{background:#262d38;border:1px solid #4a90e2;color:#cdd6e0;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .leaflet-tooltip-top:before{border-top-color:#4a90e2}
+  .leaflet-control-layers{background:#20262f !important;border:1px solid #323a47 !important;color:#cdd6e0 !important;border-radius:6px !important;padding:4px 6px !important}
   .leaflet-control-layers-expanded{padding:8px 12px !important;min-width:140px}
-  .leaflet-control-layers label{color:#e6edf7;font-size:12px;padding:2px 0;cursor:pointer}
-  .leaflet-control-layers-separator{border-top:1px solid #243154 !important;margin:6px 0 !important}
-  .leaflet-control-layers-toggle{background-color:#16223c !important}
+  .leaflet-control-layers label{color:#cdd6e0;font-size:12px;padding:2px 0;cursor:pointer}
+  .leaflet-control-layers-separator{border-top:1px solid #323a47 !important;margin:6px 0 !important}
+  .leaflet-control-layers-toggle{background-color:#262d38 !important}
   .empty-banner{
     position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    padding:18px 24px;background:#111a2e;border:1px solid #243154;
-    color:#8b97b3;border-radius:8px;font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;
+    padding:18px 24px;background:#20262f;border:1px solid #323a47;
+    color:#7a8699;border-radius:8px;font-family:"Inter","Helvetica Neue","Segoe UI",sans-serif;
     z-index:1000;text-align:center
   }
 </style>
@@ -1366,7 +1366,7 @@ function altColor(t) {
 // --- Track ---
 if (COORDS.length > 1) {
   // Single glow line under the colored segments for visual depth
-  L.polyline(COORDS, {color:'#22d3ee', weight:10, opacity:0.18}).addTo(map);
+  L.polyline(COORDS, {color:'#4a90e2', weight:10, opacity:0.18}).addTo(map);
 
   const allTrack = L.featureGroup().addTo(map);
 
@@ -1388,18 +1388,18 @@ if (COORDS.length > 1) {
     const legend = L.control({position:'bottomright'});
     legend.onAdd = function() {
       const div = L.DomUtil.create('div');
-      div.style.cssText = 'background:rgba(17,26,46,0.92);border:1px solid #243154;'
+      div.style.cssText = 'background:rgba(17,26,46,0.92);border:1px solid #323a47;'
         + 'border-radius:6px;padding:8px 10px;font-family:Inter,sans-serif;'
-        + 'color:#e6edf7;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,0.5)';
-      div.innerHTML = '<div style="font-size:10px;letter-spacing:1.5px;color:#8b97b3;'
+        + 'color:#cdd6e0;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,0.5)';
+      div.innerHTML = '<div style="font-size:10px;letter-spacing:1.5px;color:#7a8699;'
         + 'font-weight:700;margin-bottom:4px">ALTITUDE</div>'
         + '<div style="height:80px;width:14px;float:left;margin-right:8px;'
-        + 'background:linear-gradient(to top, #22d3ee 0%, #a78bfa 50%, #d9a14a 100%);'
-        + 'border-radius:3px;border:1px solid #243154"></div>'
+        + 'background:linear-gradient(to top, #4a90e2 0%, #6aa9e8 50%, #d9a14a 100%);'
+        + 'border-radius:3px;border:1px solid #323a47"></div>'
         + '<div style="font-family:JetBrains Mono,monospace;line-height:80px;font-size:10px;'
         + 'display:flex;flex-direction:column;justify-content:space-between;height:80px">'
         + '<span>' + aMax.toFixed(0) + ' m</span>'
-        + '<span style="color:#8b97b3">' + ((aMin+aMax)/2).toFixed(0) + ' m</span>'
+        + '<span style="color:#7a8699">' + ((aMin+aMax)/2).toFixed(0) + ' m</span>'
         + '<span>' + aMin.toFixed(0) + ' m</span></div>'
         + '<div style="clear:both"></div>';
       return div;
@@ -1407,19 +1407,19 @@ if (COORDS.length > 1) {
     legend.addTo(map);
   } else {
     // Fallback (no altitude data): single cyan line
-    L.polyline(COORDS, {color:'#22d3ee', weight:3, opacity:1.0}).addTo(allTrack);
+    L.polyline(COORDS, {color:'#4a90e2', weight:3, opacity:1.0}).addTo(allTrack);
   }
 
   L.circleMarker(COORDS[0], {
-    radius:8, color:'#0b1220', fillColor:'#34d399', fillOpacity:1, weight:2
+    radius:8, color:'#1a1f29', fillColor:'#5dba7c', fillOpacity:1, weight:2
   }).addTo(map).bindTooltip('start', {direction:'top', permanent:false});
   L.circleMarker(COORDS[COORDS.length-1], {
-    radius:8, color:'#0b1220', fillColor:'#f87171', fillOpacity:1, weight:2
+    radius:8, color:'#1a1f29', fillColor:'#d96666', fillOpacity:1, weight:2
   }).addTo(map).bindTooltip('end', {direction:'top', permanent:false});
 
   // Moving marker driven by the master timeline (window.setPos)
   const flightMarker = L.circleMarker(COORDS[0], {
-    radius:10, color:'#0b1220', fillColor:'#22d3ee', fillOpacity:1,
+    radius:10, color:'#1a1f29', fillColor:'#4a90e2', fillOpacity:1,
     weight:3, className:'flight-marker'
   });
   window.setPos = function(t_sec) {
@@ -1450,17 +1450,17 @@ if (COORDS.length > 1) {
   // ---- Mission waypoints ----
   if (WAYPOINTS && WAYPOINTS.length) {
     const wpLatLngs = WAYPOINTS.map(w => [w.lat, w.lng]);
-    L.polyline(wpLatLngs, {color:'#a78bfa', weight:2, opacity:0.7,
+    L.polyline(wpLatLngs, {color:'#6aa9e8', weight:2, opacity:0.7,
                            dashArray:'8,6'}).addTo(map);
     WAYPOINTS.forEach((w, i) => {
       const m = L.circleMarker([w.lat, w.lng], {
-        radius:9, color:'#0b1220', fillColor:'#a78bfa',
+        radius:9, color:'#1a1f29', fillColor:'#6aa9e8',
         fillOpacity:1, weight:2
       }).addTo(map);
       const lbl = L.divIcon({
         className:'',
         html:'<div style="font-family:Inter,sans-serif;font-size:10px;'
-            +'font-weight:700;color:#a78bfa;text-shadow:0 0 4px #0b1220,0 0 4px #0b1220">'
+            +'font-weight:700;color:#6aa9e8;text-shadow:0 0 4px #1a1f29,0 0 4px #1a1f29">'
             + (i + 1) + '</div>',
         iconSize:[12,12], iconAnchor:[6,6]
       });
@@ -1479,7 +1479,7 @@ if (COORDS.length > 1) {
 } else {
   map.setView([20,0], 2);
   const div = L.DomUtil.create('div', 'empty-banner');
-  div.innerHTML = '<div style="font-size:14px;color:#e6edf7;margin-bottom:4px">No GPS data</div>'
+  div.innerHTML = '<div style="font-size:14px;color:#cdd6e0;margin-bottom:4px">No GPS data</div>'
                 + '<div style="font-size:12px">Load a log with GPS messages to see the flight track.</div>';
   document.body.appendChild(div);
 }
@@ -2820,9 +2820,9 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception: pass
         self._incident_marker = pg.InfiniteLine(
             pos=rel, angle=90,
-            pen=pg.mkPen("#f87171", width=2, style=Qt.PenStyle.DashLine),
+            pen=pg.mkPen("#d96666", width=2, style=Qt.PenStyle.DashLine),
             label="incident",
-            labelOpts={"position": 0.95, "color": "#f87171", "fill": pg.mkBrush(BG_2)},
+            labelOpts={"position": 0.95, "color": "#d96666", "fill": pg.mkBrush(BG_2)},
         )
         self.plot.addItem(self._incident_marker, ignoreBounds=True)
         self.statusBar().showMessage(
@@ -3171,7 +3171,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Color tokens for HTML (PDF uses these directly)
         css = """
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0b1220; }
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1f29; }
           h1   { font-size: 22pt; margin: 0; letter-spacing: 3px; }
           h2   { font-size: 13pt; color: #0d7a8a; margin: 22px 0 8px;
                  letter-spacing: 2px; border-bottom: 1.5pt solid #0d7a8a;
@@ -3657,10 +3657,12 @@ class MainWindow(QtWidgets.QMainWindow):
         lv.addWidget(self.tree, 1)
         splitter.addWidget(left)
 
-        # Right: tabs
+        # Right: tabs — generous left margin so the tab strip and content
+        # are clearly separated from the messages panel on the left.
         right = QtWidgets.QWidget()
         rv = QtWidgets.QVBoxLayout(right)
-        rv.setContentsMargins(6, 12, 12, 12)
+        rv.setContentsMargins(18, 12, 12, 12)
+        rv.setSpacing(8)
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.setDocumentMode(True)
 
@@ -3928,9 +3930,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Auto Review tab
         review_container = QtWidgets.QScrollArea()
         review_container.setWidgetResizable(True)
-        review_container.setStyleSheet(f"background:{BG_1};border:1px solid {BORDER};border-radius:8px;")
+        review_container.setStyleSheet(
+            f"QScrollArea {{ background:{BG_0}; border:1px solid {BORDER}; border-radius:0; }}"
+        )
         self.review_inner = QtWidgets.QWidget()
-        self.review_inner.setStyleSheet(f"background:{BG_1};")
+        self.review_inner.setStyleSheet(f"background:{BG_0};")
         self.review_layout = QtWidgets.QVBoxLayout(self.review_inner)
         self.review_layout.setContentsMargins(18, 18, 18, 18)
         self.review_layout.setSpacing(12)
@@ -4256,26 +4260,20 @@ class MainWindow(QtWidgets.QMainWindow):
         # ---- Overall score card ----
         score_card = QtWidgets.QFrame()
         score_card.setStyleSheet(
-            f"QFrame {{ background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
-            f"stop:0 {BG_2}, stop:1 {BG_1});"
+            f"QFrame {{ background:{BG_1};"
             f" border:1px solid {BORDER};"
-            f" border-left: 5px solid {overall_color};"
-            f" border-radius:12px; }}"
+            f" border-left: 3px solid {overall_color};"
+            f" border-radius:2px; }}"
         )
-        score_shadow = QtWidgets.QGraphicsDropShadowEffect()
-        score_shadow.setBlurRadius(24)
-        score_shadow.setOffset(0, 4)
-        score_shadow.setColor(QtGui.QColor(0, 0, 0, 120))
-        score_card.setGraphicsEffect(score_shadow)
         sl = QtWidgets.QHBoxLayout(score_card)
-        sl.setContentsMargins(20, 18, 20, 18)
+        sl.setContentsMargins(20, 16, 20, 16)
         sl.setSpacing(20)
 
-        # Big icon block
-        icon = QtWidgets.QLabel("◈")
+        # Compact status indicator block
+        icon = QtWidgets.QLabel("◼")
         icon.setStyleSheet(
-            f"color:{overall_color}; font-size:36px; font-weight:700;"
-            f"min-width:44px; max-width:44px;"
+            f"color:{overall_color}; font-size:22px; font-weight:600;"
+            f"min-width:30px; max-width:30px;"
         )
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sl.addWidget(icon)
@@ -4285,11 +4283,11 @@ class MainWindow(QtWidgets.QMainWindow):
         text_block.setSpacing(2)
         kicker = QtWidgets.QLabel("OVERALL FLIGHT HEALTH")
         kicker.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:10px; font-weight:600; letter-spacing:2px;"
+            f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:2.5px;"
         )
-        verdict = QtWidgets.QLabel(overall_text)
+        verdict = QtWidgets.QLabel(overall_text.upper())
         verdict.setStyleSheet(
-            f"color:{overall_color}; font-size:22px; font-weight:700; letter-spacing:0.5px;"
+            f"color:{overall_color}; font-size:18px; font-weight:700; letter-spacing:2px;"
         )
         blurb = QtWidgets.QLabel(overall_blurb)
         blurb.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
@@ -4308,17 +4306,21 @@ class MainWindow(QtWidgets.QMainWindow):
         ):
             chip = QtWidgets.QFrame()
             chip.setStyleSheet(
-                f"QFrame {{ background:{BG_0}; border:1px solid {BORDER};"
-                f" border-radius:8px; min-width:64px; max-width:80px; }}"
+                f"QFrame {{ background:{BG_2}; border:1px solid {BORDER};"
+                f" border-top:2px solid {col};"
+                f" border-radius:2px; min-width:60px; max-width:72px; }}"
             )
             cl = QtWidgets.QVBoxLayout(chip)
-            cl.setContentsMargins(10, 8, 10, 8)
+            cl.setContentsMargins(8, 6, 8, 8)
             cl.setSpacing(0)
             num = QtWidgets.QLabel(str(count))
-            num.setStyleSheet(f"color:{col}; font-size:20px; font-weight:700;")
+            num.setStyleSheet(
+                f"color:{col}; font-size:22px; font-weight:700;"
+                f"font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
+            )
             num.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lab = QtWidgets.QLabel(label)
-            lab.setStyleSheet(f"color:{TEXT_DIM}; font-size:10px; letter-spacing:1px;")
+            lab = QtWidgets.QLabel(label.upper())
+            lab.setStyleSheet(f"color:{TEXT_DIM}; font-size:9px; letter-spacing:1.5px; font-weight:600;")
             lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
             cl.addWidget(num)
             cl.addWidget(lab)
@@ -4338,9 +4340,9 @@ class MainWindow(QtWidgets.QMainWindow):
         for it in items:
             card = QtWidgets.QFrame()
             card.setStyleSheet(
-                f"QFrame {{ background:{BG_2}; border:1px solid {BORDER};"
-                f" border-left: 4px solid {it['color']}; border-radius:8px; }}"
-                f"QFrame:hover {{ background:{BG_3}; border-color:{it['color']}; }}"
+                f"QFrame {{ background:{BG_1}; border:1px solid {BORDER};"
+                f" border-left: 3px solid {it['color']}; border-radius:2px; }}"
+                f"QFrame:hover {{ background:{BG_2}; border-color:{it['color']}; }}"
             )
             tip = it.get("tip", "")
             if tip:
@@ -4364,8 +4366,9 @@ class MainWindow(QtWidgets.QMainWindow):
             badge = QtWidgets.QLabel(it["verdict"].upper())
             badge.setStyleSheet(
                 f"background:{it['color']}; color:{BG_0};"
-                f"padding:3px 12px; border-radius:10px;"
-                f"font-size:10px; font-weight:700; letter-spacing:1.2px;"
+                f"padding:2px 10px; border-radius:0;"
+                f"font-size:10px; font-weight:700; letter-spacing:1.5px;"
+                f"font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
             )
             top.addWidget(badge)
             v.addLayout(top)
@@ -4390,11 +4393,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     )
                     row.setCursor(Qt.CursorShape.PointingHandCursor)
                     row.setStyleSheet(
-                        f"QPushButton {{ background:{BG_1}; color:{TEXT};"
+                        f"QPushButton {{ background:{BG_2}; color:{TEXT};"
                         f" border:1px solid {BORDER}; border-left:3px solid {it['color']};"
-                        f" border-radius:5px; padding:6px 10px; text-align:left;"
+                        f" border-radius:0; padding:6px 10px; text-align:left;"
                         f" font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
-                        f" font-size:11px; margin-top:4px; }}"
+                        f" font-size:11px; margin-top:4px;"
+                        f" text-transform:none; letter-spacing:0; font-weight:500; }}"
                         f"QPushButton:hover {{ background:{BG_3}; border-color:{it['color']}; color:{ACCENT}; }}"
                     )
                     row.clicked.connect(
@@ -4606,10 +4610,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Per-axis (one plot row), one curve per IMU
         # IMU1 = solid bright, IMU2 = solid dimmed, IMU3 = dashed
-        axis_colors = {"X": "#22d3ee", "Y": "#a78bfa", "Z": WARN}
+        axis_colors = {"X": "#4a90e2", "Y": "#6aa9e8", "Z": WARN}
         line_styles = [
             ("IMU",  None,          1.6),  # solid
-            ("IMU2", "#67e8f9",     1.4),  # dimmer cyan tint
+            ("IMU2", "#6aa9e8",     1.4),  # dimmer cyan tint
             ("IMU3", WARN,     1.2),  # dashed amber
         ]
         for k, axis_letter in enumerate(("X", "Y", "Z")):
@@ -4652,9 +4656,9 @@ class MainWindow(QtWidgets.QMainWindow):
                         f = float(freqs[idx])
                         if f < 2: continue
                         line = pg.InfiniteLine(pos=f, angle=90,
-                            pen=pg.mkPen("#f87171", style=Qt.PenStyle.DashLine, width=1),
+                            pen=pg.mkPen("#d96666", style=Qt.PenStyle.DashLine, width=1),
                             label=f"{f:.1f} Hz",
-                            labelOpts={"position":0.92, "color":"#f87171",
+                            labelOpts={"position":0.92, "color":"#d96666",
                                        "fill":pg.mkBrush(BG_2)})
                         plot.addItem(line, ignoreBounds=True)
             plot.setXRange(0, fs_primary / 2)
@@ -4738,7 +4742,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 n_traces += 1
             if desired in att:
                 plot.plot(x, np.asarray(att[desired], dtype=float),
-                          pen=pg.mkPen("#22d3ee", width=1.5, style=Qt.PenStyle.DashLine),
+                          pen=pg.mkPen("#4a90e2", width=1.5, style=Qt.PenStyle.DashLine),
                           name=desired)
         if n_traces == 0:
             self.pid_info.setText("  ATT has no Roll/Pitch/Yaw — incompatible log.")
@@ -4798,8 +4802,8 @@ class MainWindow(QtWidgets.QMainWindow):
         t_start = self.parsed.get("t_start") or 0.0
         x = np.asarray(rcou_t, dtype=float) - t_start
         # Per-motor traces — cycle through palette
-        palette = ["#22d3ee", WARN, "#34d399", "#f87171",
-                   "#a78bfa", "#f472b6", "#60a5fa", "#facc15"]
+        palette = ["#4a90e2", WARN, "#5dba7c", "#d96666",
+                   "#6aa9e8", "#f472b6", "#60a5fa", "#facc15"]
         motors = []   # list of (name, arr)
         for i, k in enumerate(ch_keys):
             arr = np.asarray(rcou[k], dtype=float)
