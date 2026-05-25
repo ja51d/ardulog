@@ -60,7 +60,8 @@ Native desktop log viewer and **automatic health analyzer** for ArduPilot DataFl
 
 
 <img width="1680" height="1050" alt="Screenshot 2026-05-25 at 9 13 24 PM" src="https://github.com/user-attachments/assets/2b6e34ea-1c80-4df8-b797-7a9f02db189c" />
-![Screenshot 2026-05-25 at 9 13 06 PM](https://github.com/user-attachments/assets/3b6d0e02-a5e1-4052-bfea-001c0f4ceba6)
+<img width="1680" height="1050" alt="Screenshot 2026-05-25 at 9 13 06 PM" src="https://github.com/user-attachments/assets/834f9da1-fa2c-47af-96ca-06af82efd23a" />
+
 
 
 
