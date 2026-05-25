@@ -2658,6 +2658,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("UAV Log Viewer")
+        # Sensible bounds: must be at least readable, but allow the user to
+        # shrink the window for split-screen work. Initial size only matters
+        # if the OS can't maximize (we call showMaximized() at startup).
+        self.setMinimumSize(960, 600)
         self.resize(1500, 950)
 
         self.parsed: dict | None = None
@@ -2683,14 +2687,37 @@ class MainWindow(QtWidgets.QMainWindow):
         # Restore window position/size/splitter/tab from the previous session
         self._restore_window_state()
 
+    def changeEvent(self, event: QtCore.QEvent):
+        """When the window is minimized/maximized/restored, QWebEngineView
+        contents (Map, 3D, Cockpit) sometimes go blank until forced to
+        re-paint. Force a repaint after every window-state change."""
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.Type.WindowStateChange:
+            QtCore.QTimer.singleShot(50, self._refresh_web_views)
+
+    def resizeEvent(self, event):
+        """Same fix as changeEvent — drag-resizing also blanks WebEngine
+        on some macOS / Qt versions."""
+        super().resizeEvent(event)
+        QtCore.QTimer.singleShot(0, self._refresh_web_views)
+
+    def _refresh_web_views(self):
+        for attr in ("map_view", "view3d", "instruments_view"):
+            v = getattr(self, attr, None)
+            if v is not None:
+                try:
+                    v.update()
+                    v.repaint()
+                except Exception:
+                    pass
+
     # ----- Window state persistence -----
     def _restore_window_state(self):
-        geo = self.config.get("window_geometry")
-        if isinstance(geo, str):
-            try:
-                self.restoreGeometry(QtCore.QByteArray.fromHex(geo.encode("ascii")))
-            except Exception:
-                pass
+        # We always start maximized at launch (see __main__), so do NOT call
+        # restoreGeometry here — that used to clobber the maximized state
+        # with the previous session's window size. Splitter sizes and last
+        # tab are still restored, since those are layout state inside the
+        # maximized window.
         sizes = self.config.get("splitter_sizes")
         if isinstance(sizes, list) and len(sizes) == 2:
             try:
@@ -3330,9 +3357,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Drop card — cleaner, single focal point. Just an icon + text + hint.
         # No button or "or" divider inside; that just creates visual noise.
         self.welcome_drop = QtWidgets.QFrame()
-        self.welcome_drop.setMinimumHeight(190)
-        self.welcome_drop.setMinimumWidth(560)
+        self.welcome_drop.setMinimumHeight(150)
+        self.welcome_drop.setMinimumWidth(360)
         self.welcome_drop.setMaximumWidth(720)
+        self.welcome_drop.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Preferred,
+            QtWidgets.QSizePolicy.Policy.Preferred)
         self.welcome_drop.setStyleSheet(
             f"QFrame {{"
             f"  background: {BG_1};"
@@ -3450,7 +3480,10 @@ class MainWindow(QtWidgets.QMainWindow):
             row = QtWidgets.QPushButton(f"  {short}")
             row.setCursor(Qt.CursorShape.PointingHandCursor)
             row.setToolTip(path)
-            row.setMinimumWidth(560)
+            row.setMinimumWidth(0)
+            row.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Fixed)
             row.setStyleSheet(
                 f"QPushButton {{ background:transparent; color:{TEXT_DIM};"
                 f" border:none; padding:6px 4px; text-align:left;"
@@ -3474,11 +3507,10 @@ class MainWindow(QtWidgets.QMainWindow):
         header = QtWidgets.QFrame()
         header.setObjectName("header")
         header.setStyleSheet(
-            f"QFrame#header {{ background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
-            f"stop:0 {BG_1}, stop:0.6 {BG_0}, stop:1 {BG_1});"
+            f"QFrame#header {{ background:{BG_1}; "
             f"border-bottom: 1px solid {BORDER}; }}"
         )
-        header.setFixedHeight(72)
+        header.setFixedHeight(64)
         h = QtWidgets.QHBoxLayout(header)
         h.setContentsMargins(22, 10, 22, 10)
         h.setSpacing(14)
@@ -3524,14 +3556,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         h.addStretch(1)
 
-        # Telemetry summary chip
+        # Telemetry summary chip — must be allowed to shrink so the
+        # right-hand action buttons stay visible on narrow windows.
         self.header_summary = QtWidgets.QLabel("no log loaded")
         self.header_summary.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:11px; padding:8px 14px;"
-            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:8px;"
+            f"color:{TEXT_DIM}; font-size:11px; padding:6px 12px;"
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:2px;"
             f"font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;"
         )
-        h.addWidget(self.header_summary)
+        self.header_summary.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Ignored,
+            QtWidgets.QSizePolicy.Policy.Preferred)
+        self.header_summary.setMinimumWidth(0)
+        h.addWidget(self.header_summary, 1)
 
         # Prominent credit badge in the header
         credit_badge = QtWidgets.QLabel(
@@ -3541,10 +3578,9 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         credit_badge.setTextFormat(Qt.TextFormat.RichText)
         credit_badge.setStyleSheet(
-            f"padding:10px 18px;"
-            f"background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
-            f"stop:0 {BG_2}, stop:1 {BG_1});"
-            f"border:1px solid {ACCENT}; border-radius:8px;"
+            f"padding:8px 14px;"
+            f"background:{BG_2};"
+            f"border:1px solid {BORDER}; border-radius:2px;"
         )
         h.addWidget(credit_badge)
 
@@ -5162,7 +5198,9 @@ def main():
     app.setPalette(pal)
 
     win = MainWindow()
-    win.show()
+    # Always start maximized — fills the screen but keeps the title bar
+    # so the user can still minimize / close normally.
+    win.showMaximized()
 
     # App-wide drag-and-drop filter — catches drops landing on any child
     # widget (esp. QWebEngineView, which would otherwise swallow them).
