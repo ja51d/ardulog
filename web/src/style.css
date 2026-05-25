@@ -1,0 +1,42 @@
+/* SCADA palette — mirrors the desktop app's constants */
+:root {
+  --bg-0: #1a1f29;
+  --bg-1: #20262f;
+  --bg-2: #262d38;
+  --bg-3: #2f3742;
+  --border: #323a47;
+  --text: #cdd6e0;
+  --text-dim: #7a8699;
+  --accent: #4a90e2;
+  --accent-2: #6aa9e8;
+  --danger: #d96666;
+  --success: #5dba7c;
+  --warn: #d9a14a;
+  --font-ui: 'Inter', 'Helvetica Neue', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, 'Cascadia Code', Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-0); border-left: 1px solid var(--border); }
+::-webkit-scrollbar-thumb { background: var(--bg-3); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
