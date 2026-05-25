@@ -41,11 +41,17 @@ onMounted(() => {
     zoomControl: true,
     attributionControl: true,
   })
-  // Dark tile layer (Carto Dark Matter — free, attribution required)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  // Satellite imagery (Esri World Imagery — free, no API key required)
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '© Esri · Maxar · Earthstar Geographics',
+  }).addTo(map)
+  // Thin label overlay so place names stay readable on top of imagery
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
     subdomains: 'abcd',
-    attribution: '© OpenStreetMap contributors © CARTO',
+    attribution: '© CARTO',
+    opacity: 0.8,
   }).addTo(map)
   map.setView([0, 0], 2)
   renderTrack()

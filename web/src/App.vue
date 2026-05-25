@@ -10,6 +10,10 @@ import Review from './components/Review.vue'
 import Params from './components/Params.vue'
 import MapView from './components/MapView.vue'
 import Plot from './components/Plot.vue'
+import Motors from './components/Motors.vue'
+import PidTuning from './components/PidTuning.vue'
+import Info from './components/Info.vue'
+import Cockpit from './components/Cockpit.vue'
 
 const parsed = ref(null)
 const error = ref(null)
@@ -81,6 +85,10 @@ const frame = computed(() => parsed.value ? detectFrameKind(parsed.value).toUppe
         <Params    v-else-if="activeTab === 'params'"  :parsed="parsed" />
         <MapView   v-else-if="activeTab === 'map'"     :parsed="parsed" />
         <Plot      v-else-if="activeTab === 'plot'"    :parsed="parsed" />
+        <Motors    v-else-if="activeTab === 'motors'"  :parsed="parsed" />
+        <PidTuning v-else-if="activeTab === 'pid'"     :parsed="parsed" />
+        <Info      v-else-if="activeTab === 'info'"    :parsed="parsed" />
+        <Cockpit   v-else-if="activeTab === 'cockpit'" :parsed="parsed" />
         <div v-else class="placeholder">
           <div class="placeholder-title">{{ activeTab.toUpperCase() }}</div>
           <div class="placeholder-sub">This view is part of phase 2. The desktop app has it today;

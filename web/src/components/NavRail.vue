@@ -11,17 +11,17 @@ const SECTIONS = [
     { key: 'plot',     label: 'PLOT',       icon: '∿' },
     { key: 'map',      label: 'MAP',        icon: '◎' },
     { key: '3d',       label: '3D',         icon: '◢', soon: true },
-    { key: 'cockpit',  label: 'COCKPIT',    icon: '◉', soon: true },
+    { key: 'cockpit',  label: 'COCKPIT',    icon: '◉' },
   ]},
   { title: 'ANALYZE', items: [
     { key: 'fft',      label: 'FFT',        icon: '≋', soon: true },
-    { key: 'pid',      label: 'PID TUNING', icon: '∿', soon: true },
-    { key: 'motors',   label: 'MOTORS',     icon: '◰', soon: true },
+    { key: 'pid',      label: 'PID TUNING', icon: '∿' },
+    { key: 'motors',   label: 'MOTORS',     icon: '◰' },
     { key: 'review',   label: 'REVIEW',     icon: '◇' },
   ]},
   { title: 'DATA', items: [
     { key: 'params',   label: 'PARAMS',     icon: '☰' },
-    { key: 'info',     label: 'INFO',       icon: 'ⓘ', soon: true },
+    { key: 'info',     label: 'INFO',       icon: 'ⓘ' },
   ]},
 ]
 </script>
