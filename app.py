@@ -1482,6 +1482,31 @@ if (COORDS.length > 1) {
 """
 
 
+def detect_frame_kind(parsed: dict) -> str:
+    """Classify the airframe for motor / servo interpretation.
+    Returns 'copter' (multirotor incl. VTOL hover side), 'plane', 'heli',
+    'rover', 'sub', or 'other'. Drives whether per-RCOU spread / desync
+    analysis makes sense."""
+    mt = parsed.get("vehicle_type")
+    # MAV_TYPE values from pymavlink
+    if mt in {2, 3, 13, 14, 15, 19, 20, 21, 22, 23}:
+        return "copter"      # quad / hex / oct / tri / coax / VTOL variants
+    if mt == 1:
+        return "plane"
+    if mt == 4:
+        return "heli"
+    if mt in (10, 11):
+        return "rover"
+    if mt == 12:
+        return "sub"
+    params = parsed.get("params") or {}
+    if params.get("Q_ENABLE"):
+        return "copter"      # quadplane in VTOL mode behaves like a copter
+    if "FRAME_CLASS" in params and params.get("FRAME_CLASS"):
+        return "copter"      # ArduCopter sets FRAME_CLASS; ArduPlane does not
+    return "other"
+
+
 def auto_review(parsed: dict) -> list[dict]:
     """Run a plain-English health check across the parsed log.
     Returns a list of {category, verdict, color, headline, detail} dicts."""
@@ -1778,33 +1803,46 @@ def auto_review(parsed: dict) -> list[dict]:
                 f"throttle just to stay level — fine for acro, watch altitude loss otherwise.")
 
     # ---------- Throttle / motor output balance ----------
+    # Only meaningful on multirotors / helis. On a plane, RCOU channels are
+    # servos (aileron/elevator/rudder) sitting at ~1500 µs plus a throttle
+    # channel — comparing their spread says nothing about motor health.
+    kind = detect_frame_kind(parsed)
     rcou = data.get("RCOU")
-    if rcou:
+    if rcou and kind in ("copter", "heli"):
         ch_keys = [k for k in rcou.keys() if k.startswith("C") and k[1:].isdigit()]
         ch_keys = sorted(ch_keys, key=lambda s: int(s[1:]))[:8]  # first 8 motors
         if len(ch_keys) >= 4:
-            means = []
+            named_means: list[tuple[str, float]] = []
             for k in ch_keys:
                 arr = np.asarray(rcou[k], dtype=float)
                 arr = arr[(arr > 1050) & (arr < 2000)]  # only flying samples
-                if len(arr): means.append(float(np.mean(arr)))
-            if len(means) >= 4:
+                if len(arr):
+                    named_means.append((k, float(np.mean(arr))))
+            if len(named_means) >= 4:
+                means = [m for _, m in named_means]
                 spread = max(means) - min(means)
                 avg = sum(means) / len(means)
+                # Identify worst offender: motor with largest |Δ| from average
+                worst_k, worst_m = max(named_means, key=lambda nm: abs(nm[1] - avg))
+                worst_delta = worst_m - avg
+                sign = "+" if worst_delta >= 0 else ""
+                role = "working harder" if worst_delta > 0 else "underloaded / weaker"
+                worst_str = f"{worst_k} ({sign}{worst_delta:.0f} µs vs avg — {role})"
                 if spread < 60:
                     add("Motor balance", "Good", SUCCESS,
                         f"Motors well balanced (spread {spread:.0f} µs across {len(means)} motors).",
-                        f"Average PWM {avg:.0f} µs. Less than 60 µs spread is healthy.")
+                        f"Average PWM {avg:.0f} µs. Less than 60 µs spread is healthy. "
+                        f"Largest deviation: {worst_str}.")
                 elif spread < 150:
                     add("Motor balance", "Marginal", "#fbbf24",
-                        f"Motors slightly uneven (spread {spread:.0f} µs).",
+                        f"Motors slightly uneven (spread {spread:.0f} µs). Worst: {worst_k}.",
                         f"Could be CG offset, prop wear, or one motor working harder. "
-                        f"Check propellers and CG.")
+                        f"Outlier: {worst_str}. Check that motor's prop, bell, and arm.")
                 else:
                     add("Motor balance", "Bad", DANGER,
-                        f"Motor output spread is large ({spread:.0f} µs).",
-                        f"One motor is doing much more work than the others — usually a "
-                        f"CG / weight imbalance, bent arm, or weak motor.")
+                        f"Motor output spread is large ({spread:.0f} µs). Worst: {worst_k}.",
+                        f"{worst_str}. Usually a CG / weight imbalance, bent arm, weak motor, "
+                        f"or damaged prop on that specific channel. Inspect {worst_k} first.")
 
     # ---------- Power consumption ----------
     bat_block = None
@@ -3412,6 +3450,51 @@ class MainWindow(QtWidgets.QMainWindow):
             pid_layout.addWidget(p, 1)
         self.tabs.addTab(pid_container, "  PID TUNING  ")
 
+        # Motors tab — per-motor PWM, balance, desync detection
+        motors_container = QtWidgets.QWidget()
+        motors_layout = QtWidgets.QVBoxLayout(motors_container)
+        motors_layout.setContentsMargins(8, 8, 8, 8)
+        motors_layout.setSpacing(6)
+        motors_header = QtWidgets.QLabel("MOTORS · RCOU PWM PER CHANNEL · BALANCE · DESYNC EVENTS")
+        motors_header.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-weight:700;"
+            f"letter-spacing:2px; padding:4px 6px;"
+        )
+        motors_layout.addWidget(motors_header)
+        self.motors_stats = QtWidgets.QLabel(
+            "  Open a log with RCOU messages to see per-motor PWM analysis.")
+        self.motors_stats.setStyleSheet(
+            f"color:{TEXT}; font-size:11px; padding:8px 12px;"
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:6px;"
+            f"font-family: 'JetBrains Mono', monospace;"
+        )
+        self.motors_stats.setTextFormat(Qt.TextFormat.RichText)
+        motors_layout.addWidget(self.motors_stats)
+
+        self.motors_plot = pg.PlotWidget(axisItems={"bottom": IstanbulTimeAxis(orientation="bottom")})
+        self.motors_plot.setBackground(BG_1)
+        self.motors_plot.showGrid(x=True, y=True, alpha=0.15)
+        self.motors_plot.setLabel("bottom", "Time", color=TEXT_DIM)
+        self.motors_plot.setLabel("left", "PWM (µs)", color=TEXT_DIM)
+        self.motors_plot.setClipToView(True)
+        self.motors_plot.setDownsampling(auto=True, mode="peak")
+        for ax in ("left", "bottom"):
+            a = self.motors_plot.getAxis(ax); a.setPen(pg.mkPen(BORDER)); a.setTextPen(pg.mkPen(TEXT_DIM))
+        self.motors_plot.addLegend(brush=pg.mkBrush(BG_2), pen=pg.mkPen(BORDER), labelTextColor=TEXT)
+        motors_layout.addWidget(self.motors_plot, 2)
+
+        self.motors_events = QtWidgets.QLabel("")
+        self.motors_events.setStyleSheet(
+            f"color:{TEXT}; font-size:11px; padding:8px 12px;"
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:6px;"
+            f"font-family: 'JetBrains Mono', monospace;"
+        )
+        self.motors_events.setTextFormat(Qt.TextFormat.RichText)
+        self.motors_events.setWordWrap(True)
+        motors_layout.addWidget(self.motors_events)
+
+        self.tabs.addTab(motors_container, "  MOTORS  ")
+
         # Instruments tab (cockpit: attitude, heading, altitude, sticks)
         self.instruments_view = QWebEngineView()
         self.instruments_view.loadFinished.connect(self._on_instruments_loaded)
@@ -3506,6 +3589,10 @@ class MainWindow(QtWidgets.QMainWindow):
             ax = pid_plot.getAxis("bottom")
             if hasattr(ax, "set_t_start"):
                 ax.set_t_start(t0)
+        if hasattr(self, "motors_plot"):
+            ax = self.motors_plot.getAxis("bottom")
+            if hasattr(ax, "set_t_start"):
+                ax.set_t_start(t0)
         # Reset cross-tab sync state (each tab has its own play controls)
         self.master_t = 0.0
         self.master_playing = False
@@ -3537,6 +3624,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_instruments()
         self._populate_fft()
         self._populate_pid()
+        self._populate_motors()
         self._populate_review()
         # Restore any saved right-click annotations for this log
         self._load_annotations_for_current_log()
@@ -4235,6 +4323,236 @@ class MainWindow(QtWidgets.QMainWindow):
                 "  Large gap → controller can't keep up (loose tuning)."
                 "  Oscillation around command → gain too high."
             )
+
+    # ----- Motors tab -----
+    def _populate_motors(self):
+        self.motors_plot.clear()
+        self.motors_events.setText("")
+        if self.parsed is None:
+            self.motors_stats.setText("  No log loaded.")
+            return
+        d = self.parsed["data"]
+        rcou = d.get("RCOU")
+        rcou_t = self.parsed["times"].get("RCOU")
+        kind = detect_frame_kind(self.parsed)
+        if not rcou or rcou_t is None or len(rcou_t) < 10:
+            self.motors_stats.setText(
+                "  No RCOU (motor output) messages in this log — can't analyse per-channel PWM.")
+            return
+        ch_keys = sorted(
+            [k for k in rcou.keys() if k.startswith("C") and k[1:].isdigit()],
+            key=lambda s: int(s[1:]),
+        )[:8]
+        if not ch_keys:
+            self.motors_stats.setText("  RCOU has no C1..Cn channels — incompatible log.")
+            return
+        t_start = self.parsed.get("t_start") or 0.0
+        x = np.asarray(rcou_t, dtype=float) - t_start
+        # Per-motor traces — cycle through palette
+        palette = ["#22d3ee", "#fbbf24", "#34d399", "#f87171",
+                   "#a78bfa", "#f472b6", "#60a5fa", "#facc15"]
+        motors = []   # list of (name, arr)
+        for i, k in enumerate(ch_keys):
+            arr = np.asarray(rcou[k], dtype=float)
+            if len(arr) != len(x):
+                continue
+            # Filter obvious garbage (pre-arm zeros, full-scale outliers)
+            finite = np.isfinite(arr)
+            if not finite.any() or np.nanmax(arr[finite]) < 900:
+                continue
+            motors.append((k, arr))
+            self.motors_plot.plot(x, arr, pen=pg.mkPen(palette[i % len(palette)], width=1.3), name=k)
+        if not motors:
+            self.motors_stats.setText("  RCOU channels are empty or below 900 µs — no usable channel data.")
+            return
+        # ---- Plane / rover / unknown frame: don't pretend channels are motors ----
+        if kind in ("plane", "rover", "sub", "other"):
+            label_map = {"plane": "SERVOS / THROTTLE", "rover": "RC OUTPUTS",
+                         "sub": "RC OUTPUTS", "other": "RC OUTPUTS"}
+            hint_map = {
+                "plane": ("On a fixed-wing, RCOU channels are aileron / elevator / throttle / "
+                          "rudder servos — not independent motors. Comparing means or spread "
+                          "between them is meaningless. Look at the throttle channel (usually C3) "
+                          "for engine output; the rest should sit near 1500 µs at trim."),
+                "rover": "Ground vehicle — RCOU channels are throttle / steering servos.",
+                "sub":   "Submarine — RCOU channels drive thrusters in a mixed configuration.",
+                "other": "Vehicle type not recognised — showing raw per-channel PWM only.",
+            }
+            rows_html = (
+                f"<table cellspacing='0' cellpadding='4' style='font-family:JetBrains Mono,monospace;font-size:11px'>"
+                f"<tr style='color:{TEXT_DIM}'>"
+                f"<td>CHANNEL</td><td>MIN</td><td>MEAN</td><td>MAX</td><td>RANGE</td><td>LIKELY ROLE</td></tr>"
+            )
+            plane_roles = {"C1": "aileron", "C2": "elevator", "C3": "throttle",
+                           "C4": "rudder", "C5": "aux", "C6": "aux", "C7": "aux", "C8": "aux"}
+            for name, arr in motors:
+                finite = arr[np.isfinite(arr)]
+                if not len(finite):
+                    continue
+                mn, mx = float(np.min(finite)), float(np.max(finite))
+                mean = float(np.mean(finite))
+                role = plane_roles.get(name, "—") if kind == "plane" else "—"
+                rows_html += (
+                    f"<tr>"
+                    f"<td style='color:{TEXT}'>{name}</td>"
+                    f"<td style='color:{TEXT}'>{mn:.0f}</td>"
+                    f"<td style='color:{TEXT}'>{mean:.0f}</td>"
+                    f"<td style='color:{TEXT}'>{mx:.0f}</td>"
+                    f"<td style='color:{TEXT}'>{mx - mn:.0f} µs</td>"
+                    f"<td style='color:{TEXT_DIM}'>{role}</td>"
+                    f"</tr>"
+                )
+            rows_html += "</table>"
+            self.motors_stats.setText(
+                f"<div style='font-size:11px'>"
+                f"<span style='color:{ACCENT};font-weight:700;letter-spacing:1px'>{label_map[kind]}</span> "
+                f"<span style='color:{TEXT_DIM}'>· frame type: {kind} · {len(motors)} channels</span>"
+                f"<br/><span style='color:{TEXT_DIM}'>{hint_map[kind]}</span></div>"
+                f"{rows_html}"
+            )
+            return
+        # ---- Per-motor stats (only count "armed" samples: any motor > 1100 µs) ----
+        all_arr = np.vstack([m[1] for m in motors])
+        armed_mask = np.any(all_arr > 1100, axis=0)
+        n_armed = int(armed_mask.sum())
+        if n_armed < 10:
+            self.motors_stats.setText(
+                "  Motors never appear armed (no PWM > 1100 µs) — log may be from bench / unarmed.")
+            return
+        rows = []
+        means = []
+        for name, arr in motors:
+            a = arr[armed_mask]
+            mean = float(np.mean(a))
+            sat_pct = float(np.mean(a > 1900) * 100.0)
+            means.append(mean)
+            rows.append((name, mean, sat_pct, a))
+        overall = float(np.mean(means))
+        spread = float(max(means) - min(means))
+        # Worst-offender motor: largest |Δ| from the average
+        worst_idx = int(np.argmax([abs(m - overall) for m in means]))
+        worst_name = rows[worst_idx][0]
+        worst_delta = means[worst_idx] - overall
+        worst_role = "working harder" if worst_delta > 0 else "weaker / underloaded"
+        worst_sign = "+" if worst_delta >= 0 else ""
+        # Verdict for the whole airframe — name the suspect motor in the headline
+        if spread < 60:
+            verdict_color = SUCCESS
+            verdict = f"GOOD · spread {spread:.0f} µs"
+        elif spread < 120:
+            verdict_color = "#fbbf24"
+            verdict = (f"MARGINAL · spread {spread:.0f} µs · "
+                       f"suspect {worst_name} ({worst_sign}{worst_delta:.0f} µs, {worst_role})")
+        else:
+            verdict_color = DANGER
+            verdict = (f"BAD · spread {spread:.0f} µs · "
+                       f"check {worst_name} first ({worst_sign}{worst_delta:.0f} µs, {worst_role})")
+        # Diagonal-pair check for quads (Motor 1+2 vs 3+4 in ArduPilot Quad-X mixing)
+        diag_line = ""
+        if len(motors) >= 4:
+            d1 = (means[0] + means[1]) / 2.0
+            d2 = (means[2] + means[3]) / 2.0
+            diff = d1 - d2
+            tag = ("balanced" if abs(diff) < 30
+                   else f"front/back or CG offset — pair (M1+M2) {'higher' if diff > 0 else 'lower'} by {abs(diff):.0f} µs")
+            diag_line = (
+                f"<br/><span style='color:{TEXT_DIM}'>DIAGONAL PAIRS · "
+                f"(M1+M2)/2 = {d1:.0f} µs &nbsp;·&nbsp; (M3+M4)/2 = {d2:.0f} µs &nbsp;·&nbsp; "
+                f"{tag}</span>"
+            )
+        # Build table
+        hdr = (
+            f"<table cellspacing='0' cellpadding='4' style='font-family:JetBrains Mono,monospace;font-size:11px'>"
+            f"<tr style='color:{TEXT_DIM}'>"
+            f"<td>MOTOR</td><td>MEAN PWM</td><td>Δ vs AVG</td><td>SATURATED &gt;1900</td><td>VERDICT</td></tr>"
+        )
+        for (name, mean, sat_pct, _a) in rows:
+            delta = mean - overall
+            if abs(delta) < 30:
+                m_color = SUCCESS;  m_verdict = "ok"
+            elif abs(delta) < 60:
+                m_color = "#fbbf24"; m_verdict = "watch"
+            else:
+                m_color = DANGER;   m_verdict = "working harder" if delta > 0 else "weaker / underloaded"
+            sign = "+" if delta >= 0 else ""
+            hdr += (
+                f"<tr>"
+                f"<td style='color:{TEXT}'>{name}</td>"
+                f"<td style='color:{TEXT}'>{mean:.0f} µs</td>"
+                f"<td style='color:{m_color}'>{sign}{delta:.0f} µs</td>"
+                f"<td style='color:{TEXT}'>{sat_pct:.1f} %</td>"
+                f"<td style='color:{m_color}'>{m_verdict}</td>"
+                f"</tr>"
+            )
+        hdr += "</table>"
+        self.motors_stats.setText(
+            f"<div style='font-size:11px'>"
+            f"<span style='color:{verdict_color};font-weight:700;letter-spacing:1px'>{verdict}</span>"
+            f" &nbsp;·&nbsp; <span style='color:{TEXT_DIM}'>avg {overall:.0f} µs · {n_armed} armed samples</span>"
+            f"{diag_line}</div>{hdr}"
+        )
+        # ---- Desync / spike detector ----
+        # At each armed sample, compare each motor to the mean of the others.
+        # A spike of >150 µs sustained for >0.1s is suspicious (ESC desync,
+        # demag, motor stall, prop strike).
+        try:
+            t_arr = x[armed_mask]
+            stacked = all_arr[:, armed_mask]
+            n_motors = stacked.shape[0]
+            # mean of "others" for each motor
+            total = stacked.sum(axis=0)
+            others_mean = (total[None, :] - stacked) / max(1, n_motors - 1)
+            dev = stacked - others_mean
+            # rough sample period
+            if len(t_arr) > 1:
+                dt = float(np.median(np.diff(t_arr)))
+                dt = dt if dt > 0 else 0.02
+            else:
+                dt = 0.02
+            min_run = max(2, int(0.1 / dt))
+            events = []  # (t_sec, motor_name, peak_dev)
+            for mi in range(n_motors):
+                flag = np.abs(dev[mi]) > 150.0
+                if not flag.any():
+                    continue
+                # find runs of True
+                idx = np.where(flag)[0]
+                if len(idx) == 0:
+                    continue
+                splits = np.where(np.diff(idx) > 1)[0]
+                groups = np.split(idx, splits + 1) if len(splits) else [idx]
+                for g in groups:
+                    if len(g) < min_run:
+                        continue
+                    seg = dev[mi, g]
+                    peak_i = int(np.argmax(np.abs(seg)))
+                    events.append((float(t_arr[g[peak_i]]), motors[mi][0], float(seg[peak_i])))
+            events.sort(key=lambda e: -abs(e[2]))
+            if not events:
+                self.motors_events.setText(
+                    f"<span style='color:{SUCCESS};font-weight:700'>NO DESYNC EVENTS</span> "
+                    f"<span style='color:{TEXT_DIM}'>· no motor deviated >150 µs from the others "
+                    f"for &gt;0.1 s. Healthy ESC/motor behaviour.</span>"
+                )
+            else:
+                lines = [
+                    f"<span style='color:{DANGER};font-weight:700'>{len(events)} DESYNC / SPIKE EVENT(S)</span> "
+                    f"<span style='color:{TEXT_DIM}'>· motor PWM diverged &gt;150 µs from the others "
+                    f"for &gt;0.1 s. Likely ESC desync, demag, prop strike, or stalled motor.</span><br/>"
+                ]
+                for t_sec, name, peak in events[:8]:
+                    wall = fmt_istanbul(t_start + t_sec)
+                    sign = "+" if peak >= 0 else ""
+                    lines.append(
+                        f"<span style='color:{TEXT_DIM}'>t+{t_sec:6.1f}s ({wall})</span> "
+                        f"&nbsp; <span style='color:{ACCENT};font-weight:700'>{name}</span> "
+                        f"<span style='color:{DANGER}'>{sign}{peak:.0f} µs vs others</span>"
+                    )
+                if len(events) > 8:
+                    lines.append(f"<span style='color:{TEXT_DIM}'>… and {len(events) - 8} more</span>")
+                self.motors_events.setText("<br/>".join(lines))
+        except Exception:
+            self.motors_events.setText("")
 
     # ----- Map tab -----
     def _populate_map(self):
