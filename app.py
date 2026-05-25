@@ -2701,6 +2701,63 @@ class MainWindow(QtWidgets.QMainWindow):
         super().resizeEvent(event)
         QtCore.QTimer.singleShot(0, self._refresh_web_views)
 
+    def _on_nav_changed(self, current, _previous):
+        if current is None: return
+        tab_idx = current.data(Qt.ItemDataRole.UserRole)
+        if isinstance(tab_idx, int) and 0 <= tab_idx < self.tabs.count():
+            self.tabs.setCurrentIndex(tab_idx)
+
+    def _sync_nav_from_tab(self, tab_idx: int):
+        """If something programmatic switches the QTabWidget (e.g. menu
+        action, incident jump-to), highlight the matching nav item."""
+        for i in range(self.nav_rail.count()):
+            it = self.nav_rail.item(i)
+            if it.data(Qt.ItemDataRole.UserRole) == tab_idx:
+                self.nav_rail.blockSignals(True)
+                self.nav_rail.setCurrentRow(i)
+                self.nav_rail.blockSignals(False)
+                break
+        self._sync_messages_panel(tab_idx)
+
+    def _sync_messages_panel(self, tab_idx: int):
+        """The MESSAGES tree only applies to the PLOT tab. Hide it for
+        every other view so the visualization gets the full width."""
+        if hasattr(self, "messages_panel"):
+            self.messages_panel.setVisible(tab_idx == 0)
+
+    def _update_metrics_strip(self):
+        if self.parsed is None:
+            if hasattr(self, "metrics_strip"):
+                self.metrics_strip.setVisible(False)
+            return
+        d = self.parsed
+        # Frame type
+        kind = detect_frame_kind(d)
+        # Mode count
+        mode_msgs = (d.get("data") or {}).get("MODE")
+        n_modes = 0
+        if mode_msgs and "Mode" in mode_msgs:
+            seq = list(mode_msgs["Mode"]); uniq = []
+            for m in seq:
+                if not uniq or uniq[-1] != m: uniq.append(m)
+            n_modes = len(uniq)
+        # Altitude
+        alt_max_str = "—"
+        pos = (d.get("data") or {}).get("POS")
+        if pos and "Alt" in pos:
+            try:
+                alts = np.asarray(pos["Alt"], dtype=float)
+                alt_max_str = f"+{float(np.nanmax(alts) - np.nanmin(alts)):.1f} m"
+            except Exception: pass
+        start = fmt_istanbul(d.get("t_start") or 0) if d.get("t_start") else "—"
+        self.metrics_labels["FRAME"].setText(kind.upper())
+        self.metrics_labels["DURATION"].setText(f"{d.get('duration', 0):.1f} s")
+        self.metrics_labels["MESSAGES"].setText(f"{d.get('count', 0):,}")
+        self.metrics_labels["MODES"].setText(str(n_modes))
+        self.metrics_labels["ALT MAX"].setText(alt_max_str)
+        self.metrics_labels["START"].setText(start)
+        self.metrics_strip.setVisible(True)
+
     def _refresh_web_views(self):
         for attr in ("map_view", "view3d", "instruments_view"):
             v = getattr(self, attr, None)
@@ -3570,18 +3627,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.header_summary.setMinimumWidth(0)
         h.addWidget(self.header_summary, 1)
 
-        # Prominent credit badge in the header
+        # Lightweight credit (small mono, lives in the right side of the
+        # header — no longer a big badge so the toolbar reads tool-first).
         credit_badge = QtWidgets.QLabel(
-            f"<span style='color:{TEXT_DIM};font-size:10px;letter-spacing:2px;font-weight:600;'>CREATED BY</span>"
-            f"&nbsp;&nbsp;<span style='color:{ACCENT};font-size:18px;font-weight:900;letter-spacing:2px;"
-            f"font-family:Inter Display,Inter,Helvetica Neue,sans-serif;'>JAVID</span>"
+            f"<span style='color:{TEXT_DIM};font-size:10px;letter-spacing:1.5px;"
+            f"font-family:JetBrains Mono,SF Mono,Menlo,monospace;'>BY JAVID</span>"
         )
         credit_badge.setTextFormat(Qt.TextFormat.RichText)
-        credit_badge.setStyleSheet(
-            f"padding:8px 14px;"
-            f"background:{BG_2};"
-            f"border:1px solid {BORDER}; border-radius:2px;"
-        )
+        credit_badge.setStyleSheet("padding:0 8px;")
         h.addWidget(credit_badge)
 
         # Export PDF report button — same row, distinct violet accent
@@ -3612,14 +3665,45 @@ class MainWindow(QtWidgets.QMainWindow):
         h.addWidget(open_btn)
         root_layout.addWidget(header)
 
-        # Thin gradient accent line under the header (cyan → violet)
-        accent_line = QtWidgets.QFrame()
-        accent_line.setFixedHeight(2)
-        accent_line.setStyleSheet(
-            f"background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
-            f"stop:0 {ACCENT}, stop:0.5 {ACCENT_2}, stop:1 {ACCENT});"
+        # Persistent metrics strip — single 1px line of key flight stats
+        # right under the header. Hidden until a log is loaded.
+        self.metrics_strip = QtWidgets.QFrame()
+        self.metrics_strip.setObjectName("metricsStrip")
+        self.metrics_strip.setStyleSheet(
+            f"QFrame#metricsStrip {{ background:{BG_0}; "
+            f"border-bottom:1px solid {BORDER}; }}"
         )
-        root_layout.addWidget(accent_line)
+        self.metrics_strip.setFixedHeight(34)
+        ms = QtWidgets.QHBoxLayout(self.metrics_strip)
+        ms.setContentsMargins(20, 0, 20, 0)
+        ms.setSpacing(0)
+        self.metrics_labels: dict[str, QtWidgets.QLabel] = {}
+        for key in ("FRAME", "DURATION", "MESSAGES", "MODES", "ALT MAX", "START"):
+            box = QtWidgets.QHBoxLayout()
+            box.setSpacing(8)
+            k = QtWidgets.QLabel(key)
+            k.setStyleSheet(
+                f"color:{TEXT_DIM}; font-size:9px; font-weight:700;"
+                f"letter-spacing:2px;"
+            )
+            v = QtWidgets.QLabel("—")
+            v.setStyleSheet(
+                f"color:{TEXT}; font-size:11px; font-weight:600;"
+                f"font-family:'JetBrains Mono','SF Mono',Menlo,monospace;"
+                f"letter-spacing:0.5px;"
+            )
+            self.metrics_labels[key] = v
+            box.addWidget(k); box.addWidget(v)
+            wrap = QtWidgets.QWidget()
+            wrap.setLayout(box)
+            wrap.setStyleSheet(
+                f"QWidget {{ padding-right:24px; border-right:1px solid {BORDER}; }}"
+            )
+            box.setContentsMargins(0, 0, 24, 0)
+            ms.addWidget(wrap)
+        ms.addStretch(1)
+        root_layout.addWidget(self.metrics_strip)
+        self.metrics_strip.setVisible(False)
 
         # Master playback bar removed — each tab has its own play controls.
         # We keep a master time variable so incident-click can still sync
@@ -3627,20 +3711,54 @@ class MainWindow(QtWidgets.QMainWindow):
         self.master_t = 0.0
         self.master_playing = False
 
-        # --- Body splitter ---
+        # --- Body: nav rail | (messages tree) | tab content ---
+        body = QtWidgets.QWidget()
+        body_layout = QtWidgets.QHBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+
+        # Left vertical nav rail — primary navigation. Replaces the
+        # horizontal tab strip. Sections group related views.
+        self.nav_rail = QtWidgets.QListWidget()
+        self.nav_rail.setObjectName("navRail")
+        self.nav_rail.setFixedWidth(190)
+        self.nav_rail.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.nav_rail.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.nav_rail.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.nav_rail.setStyleSheet(
+            f"QListWidget#navRail {{ background:{BG_1}; border:none;"
+            f" border-right:1px solid {BORDER}; padding:8px 0; outline:0; }}"
+            f"QListWidget#navRail::item {{ color:{TEXT_DIM};"
+            f" padding:9px 18px 9px 22px; border:none;"
+            f" border-left:2px solid transparent;"
+            f" font-size:12px; font-weight:600; letter-spacing:1.5px;"
+            f" font-family:'Inter','Helvetica Neue',sans-serif; }}"
+            f"QListWidget#navRail::item:hover {{ background:{BG_2}; color:{TEXT}; }}"
+            f"QListWidget#navRail::item:selected {{ background:{BG_2};"
+            f" color:{ACCENT}; border-left:2px solid {ACCENT}; }}"
+            f"QListWidget#navRail::item:disabled {{ color:{TEXT_DIM};"
+            f" background:transparent; padding:14px 18px 4px 22px;"
+            f" font-size:9px; letter-spacing:3px; font-weight:700;"
+            f" border-left:2px solid transparent; }}"
+        )
+        body_layout.addWidget(self.nav_rail)
+
+        # Right side: splitter with (messages tree, tabs)
         self.splitter = splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(1)
 
-        # Left: searchable message tree
-        left = QtWidgets.QWidget()
-        lv = QtWidgets.QVBoxLayout(left)
-        lv.setContentsMargins(12, 12, 6, 12)
+        # Messages panel — searchable message/field tree. Only useful on
+        # the PLOT tab; hidden on every other view.
+        self.messages_panel = QtWidgets.QWidget()
+        lv = QtWidgets.QVBoxLayout(self.messages_panel)
+        lv.setContentsMargins(14, 12, 8, 12)
         lv.setSpacing(8)
 
-        sidebar_label = QtWidgets.QLabel("MESSAGES")
+        sidebar_label = QtWidgets.QLabel("MESSAGES · FIELDS")
         sidebar_label.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:11px; font-weight:600;"
-            f"letter-spacing:1.5px; padding:0 4px;"
+            f"color:{TEXT_DIM}; font-size:10px; font-weight:700;"
+            f"letter-spacing:2px; padding:0 2px 4px;"
+            f"border-bottom:1px solid {BORDER};"
         )
         lv.addWidget(sidebar_label)
 
@@ -3655,16 +3773,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tree.setIndentation(14)
         self.tree.itemChanged.connect(self.on_tree_changed)
         lv.addWidget(self.tree, 1)
-        splitter.addWidget(left)
+        splitter.addWidget(self.messages_panel)
 
-        # Right: tabs — generous left margin so the tab strip and content
-        # are clearly separated from the messages panel on the left.
+        # Right: tabs (header bar hidden, nav rail drives the selection)
         right = QtWidgets.QWidget()
         rv = QtWidgets.QVBoxLayout(right)
-        rv.setContentsMargins(18, 12, 12, 12)
+        rv.setContentsMargins(14, 10, 12, 12)
         rv.setSpacing(8)
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().setVisible(False)  # nav rail is the navigation
 
         # Plot tab
         plot_container = QtWidgets.QWidget()
@@ -3951,8 +4069,51 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([340, 1160])
-        root_layout.addWidget(splitter, 1)
+        splitter.setSizes([300, 1110])
+        body_layout.addWidget(splitter, 1)
+        root_layout.addWidget(body, 1)
+
+        # Populate the nav rail. Sections group related views; each entry
+        # carries the tab index it points to via Qt.UserRole.
+        NAV_SECTIONS = [
+            ("VISUALIZE", [
+                (0, "PLOT",       "◐"),
+                (1, "MAP",        "◎"),
+                (2, "3D",         "◢"),
+                (7, "COCKPIT",    "◉"),
+            ]),
+            ("ANALYZE", [
+                (3, "FFT",        "≋"),
+                (4, "PID TUNING", "∿"),
+                (5, "MOTORS",     "◰"),
+                (8, "REVIEW",     "◇"),
+            ]),
+            ("DATA", [
+                (6, "PARAMS",     "☰"),
+                (9, "INFO",       "ⓘ"),
+            ]),
+        ]
+        self._nav_tab_indices: list[int] = []
+        for section_title, entries in NAV_SECTIONS:
+            hdr = QtWidgets.QListWidgetItem(section_title)
+            hdr.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.nav_rail.addItem(hdr)
+            for tab_idx, label, icon in entries:
+                item = QtWidgets.QListWidgetItem(f"  {icon}    {label}")
+                item.setData(Qt.ItemDataRole.UserRole, tab_idx)
+                self.nav_rail.addItem(item)
+                self._nav_tab_indices.append(tab_idx)
+        # Click → switch tab; first selectable item highlighted by default.
+        self.nav_rail.currentItemChanged.connect(self._on_nav_changed)
+        # Programmatic select first selectable (skip the disabled "VISUALIZE")
+        for i in range(self.nav_rail.count()):
+            it = self.nav_rail.item(i)
+            if it.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.nav_rail.setCurrentRow(i); break
+        # Keep nav rail in sync if tab is changed programmatically
+        self.tabs.currentChanged.connect(self._sync_nav_from_tab)
+        # Messages panel visible only on PLOT (tab 0)
+        self._sync_messages_panel(self.tabs.currentIndex())
 
         # NOTE: don't call setCentralWidget here — _build_ui wraps this root
         # into a QStackedWidget alongside the welcome page.
@@ -4055,6 +4216,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_motors()
         self._populate_params()
         self._populate_review()
+        self._update_metrics_strip()
         # Restore any saved right-click annotations for this log
         self._load_annotations_for_current_log()
         self._render_annotations()
