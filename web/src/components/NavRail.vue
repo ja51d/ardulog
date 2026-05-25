@@ -10,11 +10,11 @@ const SECTIONS = [
     { key: 'summary',  label: 'SUMMARY',    icon: '◐' },
     { key: 'plot',     label: 'PLOT',       icon: '∿' },
     { key: 'map',      label: 'MAP',        icon: '◎' },
-    { key: '3d',       label: '3D',         icon: '◢', soon: true },
+    { key: '3d',       label: '3D',         icon: '◢' },
     { key: 'cockpit',  label: 'COCKPIT',    icon: '◉' },
   ]},
   { title: 'ANALYZE', items: [
-    { key: 'fft',      label: 'FFT',        icon: '≋', soon: true },
+    { key: 'fft',      label: 'FFT',        icon: '≋' },
     { key: 'pid',      label: 'PID TUNING', icon: '∿' },
     { key: 'motors',   label: 'MOTORS',     icon: '◰' },
     { key: 'review',   label: 'REVIEW',     icon: '◇' },

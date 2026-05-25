@@ -14,6 +14,8 @@ import Motors from './components/Motors.vue'
 import PidTuning from './components/PidTuning.vue'
 import Info from './components/Info.vue'
 import Cockpit from './components/Cockpit.vue'
+import Fft from './components/Fft.vue'
+import View3D from './components/View3D.vue'
 
 const parsed = ref(null)
 const error = ref(null)
@@ -89,6 +91,8 @@ const frame = computed(() => parsed.value ? detectFrameKind(parsed.value).toUppe
         <PidTuning v-else-if="activeTab === 'pid'"     :parsed="parsed" />
         <Info      v-else-if="activeTab === 'info'"    :parsed="parsed" />
         <Cockpit   v-else-if="activeTab === 'cockpit'" :parsed="parsed" />
+        <Fft       v-else-if="activeTab === 'fft'"     :parsed="parsed" />
+        <View3D    v-else-if="activeTab === '3d'"      :parsed="parsed" />
         <div v-else class="placeholder">
           <div class="placeholder-title">{{ activeTab.toUpperCase() }}</div>
           <div class="placeholder-sub">This view is part of phase 2. The desktop app has it today;
