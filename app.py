@@ -1578,6 +1578,17 @@ def auto_review(parsed: dict) -> list[dict]:
             "Notable events the auto-analyzer flagged from the data: ERR "
             "codes, extreme attitudes, rapid altitude loss, EKF stress, RC "
             "failsafes, and low-battery alerts.",
+        "Takeoff health":
+            "Per-takeoff analysis for fixed-wing TAKEOFF mode entries. "
+            "Checks throttle ramp speed (torque-roll risk), rotation airspeed "
+            "vs stall, roll divergence from commanded, compass interference "
+            "under load, and key TKOFF_* parameter values.",
+        "CPU loop overruns":
+            "ArduPilot's main control loop runs at a fixed rate (plane 50 Hz "
+            "= 20 000 µs / loop, copter 400 Hz = 2 500 µs / loop). If a loop "
+            "overruns the budget, the autopilot is briefly 'blind' — no "
+            "servo / motor updates for that time. Usually caused by slow SD "
+            "cards stalling on log writes.",
     }
     def add(category, verdict, color, headline, detail):
         items.append({
@@ -1585,6 +1596,8 @@ def auto_review(parsed: dict) -> list[dict]:
             "headline": headline, "detail": detail,
             "tip": TIPS.get(category, ""),
         })
+
+    kind = detect_frame_kind(parsed)
 
     # ---------- Vibration ----------
     vibe = data.get("VIBE")
@@ -1806,7 +1819,6 @@ def auto_review(parsed: dict) -> list[dict]:
     # Only meaningful on multirotors / helis. On a plane, RCOU channels are
     # servos (aileron/elevator/rudder) sitting at ~1500 µs plus a throttle
     # channel — comparing their spread says nothing about motor health.
-    kind = detect_frame_kind(parsed)
     rcou = data.get("RCOU")
     if rcou and kind in ("copter", "heli"):
         ch_keys = [k for k in rcou.keys() if k.startswith("C") and k[1:].isdigit()]
@@ -1926,6 +1938,176 @@ def auto_review(parsed: dict) -> list[dict]:
                     f"Large IMU temperature swing ({spread:.0f} °C).",
                     "Big temperature shifts can shift gyro bias. Consider IMU heating or letting "
                     "the FC warm up before arming.")
+
+    # ---------- Takeoff health (fixed-wing only) ----------
+    params = parsed.get("params") or {}
+    times = parsed.get("times") or {}
+    if kind == "plane":
+        mode_msgs = data.get("MODE")
+        mode_t = times.get("MODE")
+        att = data.get("ATT")
+        att_t = times.get("ATT")
+        ctun = data.get("CTUN")
+        ctun_t = times.get("CTUN")
+        gps = data.get("GPS")
+        gps_t = times.get("GPS")
+        if (mode_msgs and "Mode" in mode_msgs and mode_t and att and att_t
+                and ctun and ctun_t):
+            mode_arr = np.asarray(mode_msgs["Mode"], dtype=int)
+            mt = np.asarray(mode_t, dtype=float)
+            t0_log = parsed.get("t_start") or 0.0
+            # ArduPlane TAKEOFF mode = 13
+            takeoff_windows = []
+            for i, mv in enumerate(mode_arr):
+                if int(mv) == 13:
+                    t_in = float(mt[i])
+                    t_out = float(mt[i + 1]) if i + 1 < len(mt) else float(mt[-1] + 30)
+                    if t_out - t_in > 1.0:
+                        takeoff_windows.append((t_in, t_out))
+            if takeoff_windows:
+                ta = np.asarray(att_t, dtype=float)
+                roll = np.asarray(att.get("Roll", []), dtype=float)
+                desr = np.asarray(att.get("DesRoll", []), dtype=float)
+                tc = np.asarray(ctun_t, dtype=float)
+                tho = np.asarray(ctun.get("ThO", []), dtype=float)
+                gs = None
+                if gps and gps_t:
+                    tg = np.asarray(gps_t, dtype=float)
+                    spd_key = "Spd" if "Spd" in gps else ("GroundSpeed" if "GroundSpeed" in gps else None)
+                    if spd_key:
+                        gs = (tg, np.asarray(gps[spd_key], dtype=float))
+                # Params (string keys for clarity)
+                p_slew     = params.get("TKOFF_THR_SLEW")
+                p_rotspd   = params.get("TKOFF_ROTATE_SPD")
+                p_arsp_use = params.get("ARSPD_USE")
+                p_aspd_min = params.get("AIRSPEED_MIN")
+                p_lvl_pit  = params.get("TKOFF_LVL_PITCH")
+                p_rddr     = params.get("KFF_RDDRMIX")
+                lines: list[str] = []
+                worst_sev = 0    # 0=ok, 1=warn, 2=bad
+                for idx, (ti, tf) in enumerate(takeoff_windows, 1):
+                    win_a = (ta >= ti) & (ta <= tf)
+                    win_c = (tc >= ti) & (tc <= tf)
+                    if win_a.sum() < 5 or win_c.sum() < 5:
+                        continue
+                    # Throttle ramp time: ThO crossing 10% → 80%
+                    tho_w = tho[win_c]; tc_w = tc[win_c]
+                    above10 = np.where(tho_w > 10)[0]
+                    above80 = np.where(tho_w > 80)[0]
+                    ramp_s = None
+                    if len(above10) and len(above80):
+                        ramp_s = float(tc_w[above80[0]] - tc_w[above10[0]])
+                    # Peak roll divergence in the window
+                    if len(roll) == len(desr):
+                        dev = np.abs(roll[win_a] - desr[win_a])
+                        peak_dev = float(np.nanmax(dev)) if dev.size else 0.0
+                    else:
+                        peak_dev = 0.0
+                    # GPS speed at the rotation moment (first time ThO > 60%)
+                    rotate_spd = None
+                    if gs is not None and len(above10):
+                        # find time when throttle first crossed 60%
+                        above60 = np.where(tho_w > 60)[0]
+                        if len(above60):
+                            t_rot = float(tc_w[above60[0]])
+                            tg_a, spd_a = gs
+                            j = int(np.argmin(np.abs(tg_a - t_rot)))
+                            rotate_spd = float(spd_a[j])
+                    # Wall-clock start
+                    wall = fmt_istanbul(t0_log + ti)
+                    bits = [f"<b>Takeoff #{idx}</b> at {wall}"]
+                    if ramp_s is not None:
+                        if ramp_s < 0.3:
+                            worst_sev = max(worst_sev, 2)
+                            bits.append(f"throttle slammed 0→80% in <b style='color:{DANGER}'>{ramp_s:.2f}s</b> (torque roll risk)")
+                        elif ramp_s < 1.0:
+                            worst_sev = max(worst_sev, 1)
+                            bits.append(f"throttle ramp {ramp_s:.2f}s (marginal)")
+                        else:
+                            bits.append(f"throttle ramp {ramp_s:.2f}s")
+                    if rotate_spd is not None and p_aspd_min:
+                        margin = rotate_spd - float(p_aspd_min)
+                        if margin < 0:
+                            worst_sev = max(worst_sev, 2)
+                            bits.append(f"rotated at <b style='color:{DANGER}'>{rotate_spd:.1f} m/s</b> — {abs(margin):.1f} m/s BELOW stall ({p_aspd_min:.0f})")
+                        elif margin < 3:
+                            worst_sev = max(worst_sev, 1)
+                            bits.append(f"rotated at {rotate_spd:.1f} m/s (only {margin:.1f} m/s stall margin)")
+                        else:
+                            bits.append(f"rotated at {rotate_spd:.1f} m/s ({margin:+.1f} m/s vs stall)")
+                    if peak_dev > 90:
+                        worst_sev = max(worst_sev, 2)
+                        bits.append(f"Roll diverged <b style='color:{DANGER}'>{peak_dev:.0f}°</b> from command — likely tumble")
+                    elif peak_dev > 30:
+                        worst_sev = max(worst_sev, 1)
+                        bits.append(f"Roll diverged {peak_dev:.0f}° from command")
+                    lines.append(" · ".join(bits))
+                # Param sanity block
+                param_warns: list[str] = []
+                if p_slew is not None and float(p_slew) < 1.0:
+                    worst_sev = max(worst_sev, 2)
+                    param_warns.append(f"TKOFF_THR_SLEW={p_slew:.1f} (set to 2–3 to ramp throttle)")
+                if p_rotspd is not None and float(p_rotspd) < 1.0:
+                    worst_sev = max(worst_sev, 1)
+                    param_warns.append(f"TKOFF_ROTATE_SPD={p_rotspd:.1f} (set to ≥ AIRSPEED_MIN + 3)")
+                if p_arsp_use is not None and float(p_arsp_use) == 0.0 and p_aspd_min:
+                    param_warns.append(f"ARSPD_USE=0 (no airspeed sensor — launch into the wind!)")
+                if p_lvl_pit is not None and float(p_lvl_pit) > 14:
+                    worst_sev = max(worst_sev, 1)
+                    param_warns.append(f"TKOFF_LVL_PITCH={p_lvl_pit:.0f}° (drop to 12° for safer climb)")
+                if p_rddr is not None and float(p_rddr) < 0.5:
+                    param_warns.append(f"KFF_RDDRMIX={p_rddr:.2f} (raise to 0.5–0.7 to fight torque roll)")
+                detail_html = "<br/>".join(lines) if lines else ""
+                if param_warns:
+                    detail_html += "<br/><br/><b>Param suggestions:</b><br/>• " + "<br/>• ".join(param_warns)
+                if lines or param_warns:
+                    verdict = "Good" if worst_sev == 0 else ("Marginal" if worst_sev == 1 else "Bad")
+                    color = SUCCESS if worst_sev == 0 else ("#fbbf24" if worst_sev == 1 else DANGER)
+                    headline = f"{len(takeoff_windows)} TAKEOFF mode entry / entries analysed."
+                    add("Takeoff health", verdict, color, headline, detail_html)
+
+    # ---------- CPU loop overruns ----------
+    pm = data.get("PM")
+    if pm:
+        # Plane 50 Hz → 20000 µs budget; copter 400 Hz → 2500 µs; default plane
+        loop_budget = 2500 if kind == "copter" else 20000
+        max_t_arr = None
+        for key in ("MaxT", "Maxt", "maxT"):
+            if key in pm:
+                max_t_arr = np.asarray(pm[key], dtype=float)
+                break
+        nlon_arr = None
+        for key in ("NLon", "nlon", "NLoop"):
+            if key in pm:
+                nlon_arr = np.asarray(pm[key], dtype=float)
+                break
+        load_arr = np.asarray(pm.get("Load", []), dtype=float) if "Load" in pm else None
+        if max_t_arr is not None and len(max_t_arr):
+            max_t = float(np.nanmax(max_t_arr))
+            ratio = max_t / loop_budget
+            n_long = int(np.nansum(nlon_arr)) if nlon_arr is not None else 0
+            load_pct = (float(np.nanmax(load_arr)) / 10.0) if load_arr is not None and len(load_arr) else None
+            extra = f" · {n_long} long-loop event(s)" if n_long else ""
+            if load_pct is not None:
+                extra += f" · peak CPU load {load_pct:.0f}%"
+            if ratio < 1.2:
+                add("CPU loop overruns", "Good", SUCCESS,
+                    f"Max loop {max_t:.0f} µs (budget {loop_budget} µs).{extra}",
+                    "Autopilot is keeping up with its control loop comfortably.")
+            elif ratio < 2.0:
+                add("CPU loop overruns", "Marginal", "#fbbf24",
+                    f"Max loop {max_t:.0f} µs — {ratio:.1f}× the {loop_budget} µs budget.{extra}",
+                    "Occasional overruns. Usually slow SD card stalls on log writes. "
+                    "Use a high-quality class-10 / A1 SD card, format with SDFormatter, "
+                    "and consider reducing LOG_BITMASK.")
+            else:
+                add("CPU loop overruns", "Bad", DANGER,
+                    f"Max loop {max_t:.0f} µs — {ratio:.1f}× the {loop_budget} µs budget.{extra}",
+                    "Significant overruns mean the autopilot is briefly 'blind' (no servo / "
+                    "motor updates). At low airspeed this contributes to wing drop and "
+                    "spiral departures. Primary fix: replace the SD card with a good "
+                    "class-10 / A1 card and re-format it. Also lower LOG_BITMASK and any "
+                    "high-rate MAVLink streams (SR0_*, SR1_*).")
 
     # ---------- Flight modes summary ----------
     mode = data.get("MODE")
@@ -3495,6 +3677,49 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.tabs.addTab(motors_container, "  MOTORS  ")
 
+        # Params tab — searchable list of all flight-controller parameters
+        params_container = QtWidgets.QWidget()
+        params_layout = QtWidgets.QVBoxLayout(params_container)
+        params_layout.setContentsMargins(8, 8, 8, 8)
+        params_layout.setSpacing(6)
+        params_header = QtWidgets.QLabel("PARAMS · FLIGHT CONTROLLER PARAMETERS FROM THE LOG")
+        params_header.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-weight:700;"
+            f"letter-spacing:2px; padding:4px 6px;"
+        )
+        params_layout.addWidget(params_header)
+        self.params_filter = QtWidgets.QLineEdit()
+        self.params_filter.setPlaceholderText("Search parameters (e.g. TKOFF, COMPASS, ARSPD)…")
+        self.params_filter.setStyleSheet(
+            f"background:{BG_2}; border:1px solid {BORDER}; border-radius:6px;"
+            f"padding:6px 10px; color:{TEXT}; font-family:'JetBrains Mono',monospace; font-size:12px;"
+        )
+        self.params_filter.textChanged.connect(self._filter_params)
+        params_layout.addWidget(self.params_filter)
+        self.params_table = QtWidgets.QTableWidget(0, 2)
+        self.params_table.setHorizontalHeaderLabels(["NAME", "VALUE"])
+        self.params_table.horizontalHeader().setStretchLastSection(True)
+        self.params_table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.params_table.verticalHeader().setVisible(False)
+        self.params_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.params_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.params_table.setStyleSheet(
+            f"QTableWidget {{ background:{BG_1}; border:1px solid {BORDER}; "
+            f"color:{TEXT}; font-family:'JetBrains Mono',monospace; font-size:11px; "
+            f"gridline-color:{BORDER}; }}"
+            f"QHeaderView::section {{ background:{BG_2}; color:{TEXT_DIM}; "
+            f"border:0; border-bottom:1px solid {BORDER}; padding:6px 10px; "
+            f"font-weight:700; letter-spacing:1px; }}"
+        )
+        params_layout.addWidget(self.params_table, 1)
+        self.params_status = QtWidgets.QLabel("")
+        self.params_status.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:10px; padding:4px 6px; "
+            f"font-family:'JetBrains Mono',monospace;"
+        )
+        params_layout.addWidget(self.params_status)
+        self.tabs.addTab(params_container, "  PARAMS  ")
+
         # Instruments tab (cockpit: attitude, heading, altitude, sticks)
         self.instruments_view = QWebEngineView()
         self.instruments_view.loadFinished.connect(self._on_instruments_loaded)
@@ -3625,6 +3850,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_fft()
         self._populate_pid()
         self._populate_motors()
+        self._populate_params()
         self._populate_review()
         # Restore any saved right-click annotations for this log
         self._load_annotations_for_current_log()
@@ -4553,6 +4779,50 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.motors_events.setText("<br/>".join(lines))
         except Exception:
             self.motors_events.setText("")
+
+    # ----- Params tab -----
+    def _populate_params(self):
+        self.params_table.setRowCount(0)
+        if self.parsed is None:
+            self.params_status.setText("")
+            return
+        params = self.parsed.get("params") or {}
+        if not params:
+            self.params_status.setText("  No PARM messages in this log.")
+            return
+        sorted_items = sorted(params.items(), key=lambda kv: kv[0])
+        self.params_table.setRowCount(len(sorted_items))
+        for row, (name, val) in enumerate(sorted_items):
+            try:
+                vstr = f"{float(val):.6g}"
+            except (TypeError, ValueError):
+                vstr = str(val)
+            name_item = QtWidgets.QTableWidgetItem(str(name))
+            val_item  = QtWidgets.QTableWidgetItem(vstr)
+            name_item.setForeground(QtGui.QColor(ACCENT))
+            val_item.setForeground(QtGui.QColor(TEXT))
+            self.params_table.setItem(row, 0, name_item)
+            self.params_table.setItem(row, 1, val_item)
+        self.params_table.resizeColumnToContents(0)
+        self.params_status.setText(f"  {len(sorted_items)} parameter(s)")
+        self._filter_params(self.params_filter.text())
+
+    def _filter_params(self, text: str):
+        needle = (text or "").strip().upper()
+        shown = 0
+        for row in range(self.params_table.rowCount()):
+            item = self.params_table.item(row, 0)
+            if item is None:
+                continue
+            match = (not needle) or (needle in item.text().upper())
+            self.params_table.setRowHidden(row, not match)
+            if match:
+                shown += 1
+        total = self.params_table.rowCount()
+        if needle:
+            self.params_status.setText(f"  {shown} of {total} match '{needle}'")
+        else:
+            self.params_status.setText(f"  {total} parameter(s)")
 
     # ----- Map tab -----
     def _populate_map(self):
