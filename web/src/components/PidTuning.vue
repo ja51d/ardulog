@@ -62,9 +62,22 @@ function handleResize() {
     }
   }
 }
-onMounted(() => { nextTick(buildAll); window.addEventListener('resize', handleResize) })
+let ro = null
+function setupRO() {
+  if (typeof ResizeObserver === 'undefined') return
+  ro = new ResizeObserver(() => {
+    handleResize()
+    if (!plots.roll && !plots.pitch && !plots.yaw) buildAll()
+  })
+  for (const el of [rollRef.value, pitchRef.value, yawRef.value]) if (el) ro.observe(el)
+}
+onMounted(() => {
+  nextTick(() => { buildAll(); setupRO() })
+  window.addEventListener('resize', handleResize)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (ro) { ro.disconnect(); ro = null }
   for (const k of Object.keys(plots)) if (plots[k]) plots[k].destroy()
 })
 watch(() => props.parsed, () => nextTick(buildAll))
@@ -121,11 +134,11 @@ watch(() => props.parsed, () => nextTick(buildAll))
 .panes {
   flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0;
 }
-.pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pane { flex: 1; min-height: 180px; display: flex; flex-direction: column; }
 .pane-label {
   color: var(--text-dim);
   font-size: 9px; letter-spacing: 2px; font-weight: 700;
   padding: 0 4px 2px;
 }
-.pane-canvas { flex: 1; min-height: 0; border: 1px solid var(--border); background: var(--bg-1); }
+.pane-canvas { flex: 1; min-height: 150px; border: 1px solid var(--border); background: var(--bg-1); }
 </style>

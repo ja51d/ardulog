@@ -59,12 +59,14 @@ function computeFft(signal, sampleHz) {
   return { freqs, mags, fs: sampleHz }
 }
 
+const errorMsg = ref('')
+
 function buildOne(axis, refEl, color) {
   if (!refEl) return
   if (plots[axis]) { plots[axis].destroy(); plots[axis] = null }
   const imu = props.parsed?.data?.IMU
   const t = props.parsed?.times?.IMU
-  if (!imu || !t?.length) return
+  if (!imu || !t?.length) { errorMsg.value = 'No IMU messages in this log.'; return }
   // Estimate sample rate from median delta-t
   const dts = []
   for (let i = 1; i < Math.min(200, t.length); i++) dts.push(t[i] - t[i-1])
@@ -74,9 +76,9 @@ function buildOne(axis, refEl, color) {
   fs.value = sampleHz
   const key = { x: 'AccX', y: 'AccY', z: 'AccZ' }[axis]
   const sig = imu[key] || []
-  if (!sig.length) return
+  if (!sig.length) { errorMsg.value = `IMU.${key} not present in this log.`; return }
   const sp = computeFft(sig, sampleHz)
-  if (!sp) return
+  if (!sp) { errorMsg.value = `Too few IMU samples for FFT (need ≥ 64).`; return }
   // Find peak frequency (ignore DC / sub-2 Hz noise)
   let bi = 0, bv = -Infinity
   for (let i = 0; i < sp.freqs.length; i++) {
@@ -104,9 +106,24 @@ function buildOne(axis, refEl, color) {
 }
 
 function buildAll() {
+  errorMsg.value = ''
   buildOne('x', xRef.value, '#4a90e2')
   buildOne('y', yRef.value, '#d9a14a')
   buildOne('z', zRef.value, '#5dba7c')
+}
+
+// uPlot can render at 0×0 if the flex container hasn't sized yet on the
+// initial mount. ResizeObserver catches the layout pass and triggers a
+// rebuild once the canvases have real pixels.
+let ro = null
+function setupResizeObserver() {
+  if (typeof ResizeObserver === 'undefined') return
+  ro = new ResizeObserver(() => {
+    handleResize()
+    // First-time build only fires if no plot yet exists
+    if (!plots.x && !plots.y && !plots.z) buildAll()
+  })
+  for (const el of [xRef.value, yRef.value, zRef.value]) if (el) ro.observe(el)
 }
 function handleResize() {
   for (const axis of ['x', 'y', 'z']) {
@@ -117,9 +134,13 @@ function handleResize() {
     }
   }
 }
-onMounted(() => { nextTick(buildAll); window.addEventListener('resize', handleResize) })
+onMounted(() => {
+  nextTick(() => { buildAll(); setupResizeObserver() })
+  window.addEventListener('resize', handleResize)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (ro) { ro.disconnect(); ro = null }
   for (const k of Object.keys(plots)) if (plots[k]) plots[k].destroy()
 })
 watch(() => props.parsed, () => nextTick(buildAll))
@@ -129,7 +150,8 @@ watch(() => props.parsed, () => nextTick(buildAll))
   <div class="fft">
     <div class="title">FFT · IMU ACCELERATION SPECTRUM PER AXIS</div>
     <div class="banner">
-      <div v-if="fs">Sample rate: <b>{{ fs.toFixed(0) }} Hz</b> (Nyquist {{ (fs/2).toFixed(0) }} Hz)</div>
+      <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
+      <div v-else-if="fs">Sample rate: <b>{{ fs.toFixed(0) }} Hz</b> (Nyquist {{ (fs/2).toFixed(0) }} Hz)</div>
       <div v-else>Open a log with IMU messages to see motor / airframe resonance peaks.</div>
       <div class="hint">Peaks near motor RPM/60 = resonance. Broad shoulders = airframe flex.</div>
     </div>
@@ -163,10 +185,11 @@ watch(() => props.parsed, () => nextTick(buildAll))
   color: var(--text);
 }
 .banner b { color: var(--accent); }
+.banner .err { color: var(--danger); font-family: var(--font-mono); }
 .banner .hint { color: var(--text-dim); font-size: 11px; margin-top: 4px; font-family: var(--font-ui); }
 .panes { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pane { flex: 1; min-height: 180px; display: flex; flex-direction: column; }
 .pane-label { color: var(--text-dim); font-size: 9px; letter-spacing: 2px; font-weight: 700; padding: 0 4px 2px; }
 .pane-label .peak { color: var(--accent); font-family: var(--font-mono); margin-left: 8px; }
-.pane-canvas { flex: 1; min-height: 0; border: 1px solid var(--border); background: var(--bg-1); }
+.pane-canvas { flex: 1; min-height: 150px; border: 1px solid var(--border); background: var(--bg-1); }
 </style>

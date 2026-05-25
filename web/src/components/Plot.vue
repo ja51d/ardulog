@@ -144,12 +144,23 @@ function handleResize() {
   plot.setSize({ width: Math.max(400, rect.width), height: Math.max(300, rect.height) })
 }
 
+let ro = null
 onMounted(() => {
-  nextTick(rebuildPlot)
+  nextTick(() => {
+    rebuildPlot()
+    if (typeof ResizeObserver !== 'undefined' && plotRef.value) {
+      ro = new ResizeObserver(() => {
+        handleResize()
+        if (!plot && selected.value.size) rebuildPlot()
+      })
+      ro.observe(plotRef.value)
+    }
+  })
   window.addEventListener('resize', handleResize)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  if (ro) { ro.disconnect(); ro = null }
   if (plot) plot.destroy()
 })
 watch(selected, () => nextTick(rebuildPlot), { deep: true })
@@ -325,7 +336,7 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
   border: 1px solid var(--border);
   background: var(--bg-1);
   position: relative;
-  min-height: 0;
+  min-height: 360px;
 }
 .hint {
   position: absolute; top: 50%; left: 50%;
