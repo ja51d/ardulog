@@ -92,17 +92,18 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from pymavlink import DFReader
 
 # ---------- Theme ----------
-BG_0 = "#0b1220"   # window background
-BG_1 = "#111a2e"   # panels
-BG_2 = "#16223c"   # raised
-BG_3 = "#1d2c4d"   # hover
-BORDER = "#243154"
-TEXT = "#e6edf7"
-TEXT_DIM = "#8b97b3"
-ACCENT = "#22d3ee"   # cyan
-ACCENT_2 = "#a78bfa" # violet
-DANGER = "#f87171"
-SUCCESS = "#34d399"
+BG_0 = "#1a1f29"   # window background — cool steel dark
+BG_1 = "#20262f"   # panels
+BG_2 = "#262d38"   # raised
+BG_3 = "#2f3742"   # hover
+BORDER = "#323a47"
+TEXT = "#cdd6e0"
+TEXT_DIM = "#7a8699"
+ACCENT = "#4a90e2"   # steel blue
+ACCENT_2 = "#6aa9e8" # lighter steel blue
+DANGER = "#d96666"
+SUCCESS = "#5dba7c"
+WARN = "#d9a14a"     # muted amber for marginal verdicts
 
 pg.setConfigOption("background", BG_1)
 pg.setConfigOption("foreground", TEXT)
@@ -115,7 +116,7 @@ PLOT_COLORS = [
     "#22d3ee",  # cyan
     "#a78bfa",  # violet
     "#34d399",  # green
-    "#fbbf24",  # amber
+    WARN,  # amber
     "#f87171",  # red
     "#60a5fa",  # blue
     "#f472b6",  # pink
@@ -142,16 +143,16 @@ QMenuBar {{
 QMenuBar::item {{
     background: transparent;
     padding: 5px 12px;
-    border-radius: 4px;
+    border-radius: 2px;
 }}
 QMenuBar::item:selected {{ background: {BG_2}; color: {ACCENT}; }}
 QMenu {{
     background: {BG_1};
     border: 1px solid {BORDER};
-    padding: 6px;
-    border-radius: 8px;
+    padding: 4px;
+    border-radius: 2px;
 }}
-QMenu::item {{ padding: 7px 22px; border-radius: 5px; }}
+QMenu::item {{ padding: 6px 22px; border-radius: 2px; }}
 QMenu::item:selected {{ background: {BG_3}; color: {ACCENT}; }}
 QMenu::separator {{
     height: 1px;
@@ -179,26 +180,26 @@ QSplitter::handle:hover {{ background: {ACCENT}; }}
 QLineEdit {{
     background: {BG_2};
     border: 1px solid {BORDER};
-    border-radius: 6px;
-    padding: 7px 12px;
+    border-radius: 2px;
+    padding: 6px 10px;
     selection-background-color: {ACCENT};
     selection-color: {BG_0};
 }}
 QLineEdit:focus {{
     border: 1px solid {ACCENT};
-    background: {BG_3};
+    background: {BG_2};
 }}
 
 QTreeWidget {{
     background: {BG_1};
     border: 1px solid {BORDER};
-    border-radius: 8px;
+    border-radius: 2px;
     outline: 0;
-    padding: 6px;
+    padding: 4px;
 }}
 QTreeWidget::item {{
-    padding: 5px 6px;
-    border-radius: 4px;
+    padding: 4px 6px;
+    border-radius: 0;
     border: 1px solid transparent;
 }}
 QTreeWidget::item:hover {{ background: {BG_2}; }}
@@ -224,9 +225,9 @@ QHeaderView::section {{
     letter-spacing: 1.5px;
 }}
 QTreeView::indicator {{
-    width: 14px; height: 14px;
+    width: 12px; height: 12px;
     border: 1px solid {BORDER};
-    border-radius: 3px;
+    border-radius: 1px;
     background: {BG_2};
 }}
 QTreeView::indicator:hover {{ border: 1px solid {ACCENT}; }}
@@ -238,20 +239,23 @@ QTreeView::indicator:checked {{
 
 QTabWidget::pane {{
     border: 1px solid {BORDER};
-    border-radius: 10px;
+    border-radius: 0;
     top: -1px;
     background: {BG_1};
 }}
 QTabBar::tab {{
-    background: transparent;
+    background: {BG_0};
     color: {TEXT_DIM};
-    padding: 10px 22px;
-    margin-right: 3px;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    font-weight: 500;
-    font-size: 12px;
-    letter-spacing: 0.5px;
+    padding: 8px 18px;
+    margin-right: 1px;
+    border: 1px solid {BORDER};
+    border-bottom: 1px solid {BORDER};
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
 }}
 QTabBar::tab:hover {{
     color: {TEXT};
@@ -260,16 +264,18 @@ QTabBar::tab:hover {{
 QTabBar::tab:selected {{
     background: {BG_1};
     color: {ACCENT};
-    border: 1px solid {BORDER};
-    border-bottom: 2px solid {ACCENT};
-    font-weight: 600;
+    border-top: 2px solid {ACCENT};
+    border-left: 1px solid {BORDER};
+    border-right: 1px solid {BORDER};
+    border-bottom: 1px solid {BG_1};
+    font-weight: 700;
 }}
 
 QPlainTextEdit, QTextEdit {{
     background: {BG_1};
     border: 1px solid {BORDER};
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 2px;
+    padding: 10px;
     font-family: "JetBrains Mono", "SF Mono", Menlo, "Cascadia Code", Consolas, monospace;
     font-size: 12px;
     selection-background-color: {ACCENT};
@@ -279,16 +285,20 @@ QPlainTextEdit, QTextEdit {{
 QScrollArea {{ border: none; }}
 
 QScrollBar:vertical {{
-    background: transparent; width: 10px; margin: 2px;
+    background: {BG_0}; width: 10px; margin: 0;
+    border-left: 1px solid {BORDER};
 }}
 QScrollBar::handle:vertical {{
-    background: {BG_3}; min-height: 40px; border-radius: 5px;
+    background: {BG_3}; min-height: 30px; border-radius: 0;
 }}
 QScrollBar::handle:vertical:hover {{ background: {ACCENT}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
-QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
-QScrollBar::handle:horizontal {{ background: {BG_3}; min-width: 40px; border-radius: 5px; }}
+QScrollBar:horizontal {{
+    background: {BG_0}; height: 10px; margin: 0;
+    border-top: 1px solid {BORDER};
+}}
+QScrollBar::handle:horizontal {{ background: {BG_3}; min-width: 30px; border-radius: 0; }}
 QScrollBar::handle:horizontal:hover {{ background: {ACCENT}; }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: none; }}
@@ -296,19 +306,22 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: 
 QToolTip {{
     background: {BG_2};
     color: {TEXT};
-    border: 1px solid {ACCENT};
+    border: 1px solid {BORDER};
     padding: 6px 10px;
-    border-radius: 4px;
+    border-radius: 2px;
     font-size: 11px;
 }}
 
 QPushButton {{
     background: {BG_2};
     border: 1px solid {BORDER};
-    border-radius: 6px;
-    padding: 7px 16px;
+    border-radius: 2px;
+    padding: 6px 14px;
     color: {TEXT};
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
 }}
 QPushButton:hover {{
     background: {BG_3};
@@ -317,35 +330,30 @@ QPushButton:hover {{
 }}
 QPushButton:pressed {{ background: {BG_1}; }}
 QPushButton#primary {{
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 {ACCENT}, stop:1 #0ea5b8);
+    background: {ACCENT};
     color: {BG_0};
     border: 1px solid {ACCENT};
     font-weight: 700;
-    letter-spacing: 0.5px;
 }}
 QPushButton#primary:hover {{
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 #67e8f9, stop:1 {ACCENT});
-    border-color: #67e8f9;
+    background: {ACCENT_2};
+    border-color: {ACCENT_2};
     color: {BG_0};
 }}
 QPushButton#violet {{
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 {ACCENT_2}, stop:1 #8b5cf6);
-    color: {BG_0};
+    background: {BG_2};
+    color: {ACCENT_2};
     border: 1px solid {ACCENT_2};
     font-weight: 700;
-    letter-spacing: 0.5px;
-    padding: 7px 18px;
+    padding: 6px 16px;
 }}
 QPushButton#icon {{
     background: {BG_2};
     color: {TEXT};
     border: 1px solid {BORDER};
-    border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 18px;
+    border-radius: 2px;
+    padding: 6px 10px;
+    font-size: 16px;
     font-weight: 400;
 }}
 QPushButton#icon:hover {{
@@ -354,16 +362,14 @@ QPushButton#icon:hover {{
     color: {ACCENT};
 }}
 QPushButton#violet:hover {{
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 #c4b5fd, stop:1 {ACCENT_2});
-    border-color: #c4b5fd;
+    background: {ACCENT_2};
     color: {BG_0};
 }}
 
 QFrame#statTile {{
     background: {BG_2};
     border: 1px solid {BORDER};
-    border-radius: 8px;
+    border-radius: 2px;
 }}
 """
 
@@ -473,14 +479,14 @@ INSTRUMENTS_HTML_TEMPLATE = """<!DOCTYPE html>
   .ai-pitch-tick{stroke:#ffffff;stroke-width:1.1;stroke-linecap:round;opacity:0.95}
   .ai-pitch-label{fill:#ffffff;font-size:7px;font-family:"JetBrains Mono",monospace;font-weight:700}
   .ai-frame{fill:none;stroke:#2a3a5a;stroke-width:2.5}
-  .ai-aircraft{fill:none;stroke:#fbbf24;stroke-width:3;stroke-linecap:round}
+  .ai-aircraft{fill:none;stroke:#d9a14a;stroke-width:3;stroke-linecap:round}
   .ai-roll-tick{stroke:#ffffff;stroke-width:1.2}
-  .ai-roll-pointer{fill:#fbbf24}
+  .ai-roll-pointer{fill:#d9a14a}
   .hsi-card{fill:#06101e;stroke:#2a3a5a;stroke-width:2}
   .hsi-tick{stroke:#e6edf7;stroke-width:1.2;stroke-linecap:round}
   .hsi-cardinal{fill:#22d3ee;font-size:15px;font-weight:900;font-family:"Inter",sans-serif;text-anchor:middle}
   .hsi-deg{fill:#8b97b3;font-size:8px;font-family:"JetBrains Mono",monospace;text-anchor:middle}
-  .hsi-aircraft{fill:#fbbf24;stroke:#06101e;stroke-width:1}
+  .hsi-aircraft{fill:#d9a14a;stroke:#06101e;stroke-width:1}
   .tape-bg{fill:#06101e;stroke:#2a3a5a;stroke-width:1.5}
   .tape-tick{stroke:#5b7196;stroke-width:1}
   .tape-tick-major{stroke:#e6edf7;stroke-width:1.5}
@@ -523,7 +529,7 @@ if (!D) {
           <g class="ai-aircraft">
             <line x1="-30" y1="0" x2="-10" y2="0"/>
             <line x1="30" y1="0" x2="10" y2="0"/>
-            <circle cx="0" cy="0" r="2.5" fill="#fbbf24"/>
+            <circle cx="0" cy="0" r="2.5" fill=WARN/>
             <line x1="0" y1="-12" x2="0" y2="-4"/>
           </g>
           <!-- roll scale ticks -->
@@ -546,7 +552,7 @@ if (!D) {
           <!-- aircraft symbol pointing up (fixed) -->
           <polygon class="hsi-aircraft" points="0,-58 -8,-44 -2,-44 -2,-30 -14,-30 -14,-24 -2,-24 -2,8 -10,14 -10,18 0,15 10,18 10,14 2,8 2,-24 14,-24 14,-30 2,-30 2,-44 8,-44"/>
           <!-- top pointer (fixed) -->
-          <polygon fill="#fbbf24" points="0,-90 -5,-78 5,-78"/>
+          <polygon fill=WARN points="0,-90 -5,-78 5,-78"/>
         </svg>
         <div class="readout">
           <span class="dim">HDG</span> <span id="hsi-hdg-val">000°</span>
@@ -977,7 +983,7 @@ if (!PTS || PTS.x.length < 2) {
     FACE_I = [4,4,4,4,4,5,5,5,5,5];
     FACE_J = [0,6,1,3,2,6,1,3,2,0];
     FACE_K = [6,1,3,2,0,0,6,1,3,2];
-    VERT_COLORS = ['#22d3ee','#22d3ee','#a78bfa','#a78bfa','#22d3ee','#a78bfa','#fbbf24'];
+    VERT_COLORS = ['#22d3ee','#22d3ee','#a78bfa','#a78bfa','#22d3ee','#a78bfa','#d9a14a'];
   }
 
   function rotatedAircraftVerts(i) {
@@ -1388,7 +1394,7 @@ if (COORDS.length > 1) {
       div.innerHTML = '<div style="font-size:10px;letter-spacing:1.5px;color:#8b97b3;'
         + 'font-weight:700;margin-bottom:4px">ALTITUDE</div>'
         + '<div style="height:80px;width:14px;float:left;margin-right:8px;'
-        + 'background:linear-gradient(to top, #22d3ee 0%, #a78bfa 50%, #fbbf24 100%);'
+        + 'background:linear-gradient(to top, #22d3ee 0%, #a78bfa 50%, #d9a14a 100%);'
         + 'border-radius:3px;border:1px solid #243154"></div>'
         + '<div style="font-family:JetBrains Mono,monospace;line-height:80px;font-size:10px;'
         + 'display:flex;flex-direction:column;justify-content:space-between;height:80px">'
@@ -1436,8 +1442,8 @@ if (COORDS.length > 1) {
   // ---- Geofence polygon ----
   if (FENCE && FENCE.length >= 3) {
     const poly = L.polygon(FENCE, {
-      color:'#fbbf24', weight:2, opacity:0.9,
-      fillColor:'#fbbf24', fillOpacity:0.08, dashArray:'6,6'
+      color:'#d9a14a', weight:2, opacity:0.9,
+      fillColor:'#d9a14a', fillOpacity:0.08, dashArray:'6,6'
     }).addTo(map);
     poly.bindTooltip('Geofence', {sticky:true});
   }
@@ -1733,7 +1739,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 f"Peak axis vibration was {peak:.1f} m/s²; average magnitude {mean:.1f} m/s². "
                 f"ArduPilot considers <30 m/s² fine and >60 m/s² problematic.")
         elif peak < 60 and mean < 30:
-            add("Vibration", "Marginal", "#fbbf24",
+            add("Vibration", "Marginal", WARN,
                 f"Vibration is acceptable but on the higher side.",
                 f"Peak {peak:.1f} m/s² (advisory: <30). Consider tightening props, balancing motors, "
                 f"or improving flight-controller foam/dampening.")
@@ -1755,7 +1761,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 "No accelerometer clipping events.",
                 "Clip counters did not increase during the flight — the IMU never saturated.")
         elif total_clip < 100:
-            add("IMU clipping", "Marginal", "#fbbf24",
+            add("IMU clipping", "Marginal", WARN,
                 f"{total_clip} clipping events.",
                 "A few events are usually fine but indicate occasional vibration spikes.")
         else:
@@ -1786,7 +1792,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     f"3D fix held {fix3d_pct:.0f}% of the time, average {avg_sats:.0f} satellites, "
                     f"average HDop {avg_hdop:.2f} (under 1.5 is excellent).")
             elif fix3d_pct > 50 and avg_sats >= 6 and avg_hdop < 2.5:
-                add("GPS", "Marginal", "#fbbf24",
+                add("GPS", "Marginal", WARN,
                     "GPS reception was acceptable but not great.",
                     f"3D fix {fix3d_pct:.0f}% of time, ~{avg_sats:.0f} sats, HDop {avg_hdop:.2f}. "
                     f"For modes that depend on GPS (Loiter/Auto/RTL) you want HDop <1.5 and ≥8 sats.")
@@ -1815,7 +1821,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     f"Battery healthy ({v_start:.1f}V → {v_end:.1f}V, ~{cells_guess}S pack).",
                     f"Minimum voltage {v_min:.2f}V ({per_cell_min:.2f}V/cell). Above 3.6V/cell is comfortable.")
             elif cells_guess and per_cell_min >= 3.3:
-                add("Battery", "Marginal", "#fbbf24",
+                add("Battery", "Marginal", WARN,
                     f"Battery dipped low: {v_min:.2f}V minimum (~{per_cell_min:.2f}V/cell).",
                     f"Started at {v_start:.1f}V, ended at {v_end:.1f}V. Below 3.5V/cell under load is "
                     f"approaching the safe limit — land sooner or use a bigger pack.")
@@ -1842,7 +1848,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     "Magnetic field looks stable — no obvious interference.",
                     f"Mean field {mean_m:.0f} mGauss, variation ±{std_m:.0f} ({ratio*100:.1f}%).")
             elif ratio < 0.15:
-                add("Compass", "Marginal", "#fbbf24",
+                add("Compass", "Marginal", WARN,
                     "Magnetic field shows some variation.",
                     f"Mean {mean_m:.0f} mGauss, ±{std_m:.0f} ({ratio*100:.1f}%). Could be normal flight "
                     f"or mild interference — recheck after a Compass/Motor calibration.")
@@ -1864,7 +1870,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 "EKF was confident throughout the flight.",
                 f"Velocity / position innovation peaks {sv_max:.2f} / {sp_max:.2f} (under 0.5 is healthy).")
         elif sv_max < 1.0 and sp_max < 1.0:
-            add("EKF (state estimator)", "Marginal", "#fbbf24",
+            add("EKF (state estimator)", "Marginal", WARN,
                 "EKF saw moderate uncertainty at times.",
                 f"Innovation peaks vel {sv_max:.2f}, pos {sp_max:.2f}. Above 1.0 the EKF can refuse to arm.")
         else:
@@ -1887,7 +1893,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 samples.append(f"Subsys={subs[i] if i < len(subs) else '?'} "
                                f"ECode={ecodes[i] if i < len(ecodes) else '?'}")
             add("Errors", "Bad" if n_err > 3 else "Marginal",
-                DANGER if n_err > 3 else "#fbbf24",
+                DANGER if n_err > 3 else WARN,
                 f"{n_err} error event(s) logged.",
                 "First few: " + " ; ".join(samples))
 
@@ -1930,7 +1936,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 f"Moderate manoeuvres (peak tilt {peak:.0f}°).",
                 f"Roll {peak_roll:.0f}°, pitch {peak_pitch:.0f}°. Normal sport flying.")
         else:
-            add("Attitude", "Marginal", "#fbbf24",
+            add("Attitude", "Marginal", WARN,
                 f"Aggressive tilt angles (peak {peak:.0f}°).",
                 f"Roll {peak_roll:.0f}°, pitch {peak_pitch:.0f}°. Above 45° the drone needs more "
                 f"throttle just to stay level — fine for acro, watch altitude loss otherwise.")
@@ -1966,7 +1972,7 @@ def auto_review(parsed: dict) -> list[dict]:
                         f"Average PWM {avg:.0f} µs. Less than 60 µs spread is healthy. "
                         f"Largest deviation: {worst_str}.")
                 elif spread < 150:
-                    add("Motor balance", "Marginal", "#fbbf24",
+                    add("Motor balance", "Marginal", WARN,
                         f"Motors slightly uneven (spread {spread:.0f} µs). Worst: {worst_k}.",
                         f"Could be CG offset, prop wear, or one motor working harder. "
                         f"Outlier: {worst_str}. Check that motor's prop, bell, and arm.")
@@ -2004,7 +2010,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 if pct_lost == 0:
                     add("RC link", "Good", SUCCESS, "RC signal stable for the entire flight.", "")
                 elif pct_lost < 1:
-                    add("RC link", "Marginal", "#fbbf24",
+                    add("RC link", "Marginal", WARN,
                         f"{failsafe_lo} brief RC dropouts ({pct_lost:.1f}% of samples).",
                         "A few short losses are common at long range. Check antenna orientation.")
                 else:
@@ -2027,7 +2033,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     f"Main loop ran on time (peak {peak_us:.0f} µs).",
                     "Flight controller had headroom throughout the flight.")
             elif peak_us < 4000:
-                add("Autopilot CPU", "Marginal", "#fbbf24",
+                add("Autopilot CPU", "Marginal", WARN,
                     f"Occasional loop overruns (peak {peak_us:.0f} µs, avg {avg_us:.0f}).",
                     "A few late loops are normal. If this gets worse, consider reducing logging "
                     "rate or disabling unused features.")
@@ -2054,7 +2060,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     f"IMU temperature swung {spread:.0f} °C ({t_min:.0f}–{t_max:.0f} °C).",
                     "Mild drift is normal during a flight, especially in cold weather takeoffs.")
             else:
-                add("IMU temperature", "Marginal", "#fbbf24",
+                add("IMU temperature", "Marginal", WARN,
                     f"Large IMU temperature swing ({spread:.0f} °C).",
                     "Big temperature shifts can shift gyro bias. Consider IMU heating or letting "
                     "the FC warm up before arming.")
@@ -2182,7 +2188,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     detail_html += "<br/><br/><b>Param suggestions:</b><br/>• " + "<br/>• ".join(param_warns)
                 if lines or param_warns:
                     verdict = "Good" if worst_sev == 0 else ("Marginal" if worst_sev == 1 else "Bad")
-                    color = SUCCESS if worst_sev == 0 else ("#fbbf24" if worst_sev == 1 else DANGER)
+                    color = SUCCESS if worst_sev == 0 else (WARN if worst_sev == 1 else DANGER)
                     headline = f"{len(takeoff_windows)} TAKEOFF mode entry / entries analysed."
                     add("Takeoff health", verdict, color, headline, detail_html)
 
@@ -2199,7 +2205,7 @@ def auto_review(parsed: dict) -> list[dict]:
                 continue
             if rank.get(s["verdict"], 0) > rank.get(worst_v, 0):
                 worst_v = s["verdict"]
-            badge = {"good": SUCCESS, "loose": "#fbbf24", "lagging": "#fbbf24",
+            badge = {"good": SUCCESS, "loose": WARN, "lagging": WARN,
                      "oscillating": DANGER, "no-command": TEXT_DIM}[s["verdict"]]
             if s["verdict"] == "no-command":
                 lines.append(
@@ -2216,7 +2222,7 @@ def auto_review(parsed: dict) -> list[dict]:
         if lines:
             verdict_lbl = {"good": "Good", "loose": "Marginal", "lagging": "Marginal",
                            "oscillating": "Bad", "no-command": "Good"}[worst_v]
-            verdict_clr = {"good": SUCCESS, "loose": "#fbbf24", "lagging": "#fbbf24",
+            verdict_clr = {"good": SUCCESS, "loose": WARN, "lagging": WARN,
                            "oscillating": DANGER, "no-command": SUCCESS}[worst_v]
             tracked = sum(1 for s in pid_stats.values() if s["verdict"] != "no-command")
             head = (f"Attitude controller — {worst_v} tracking "
@@ -2252,7 +2258,7 @@ def auto_review(parsed: dict) -> list[dict]:
                     f"Max loop {max_t:.0f} µs (budget {loop_budget} µs).{extra}",
                     "Autopilot is keeping up with its control loop comfortably.")
             elif ratio < 2.0:
-                add("CPU loop overruns", "Marginal", "#fbbf24",
+                add("CPU loop overruns", "Marginal", WARN,
                     f"Max loop {max_t:.0f} µs — {ratio:.1f}× the {loop_budget} µs budget.{extra}",
                     "Occasional overruns. Usually slow SD card stalls on log writes. "
                     "Use a high-quality class-10 / A1 SD card, format with SDFormatter, "
@@ -2283,7 +2289,7 @@ def auto_review(parsed: dict) -> list[dict]:
     if incidents:
         worst = max(incidents, key=lambda x: x["severity"])
         sev_label = {1: "Marginal", 2: "Marginal", 3: "Bad"}[worst["severity"]]
-        sev_color = {1: "#fbbf24", 2: "#fbbf24", 3: DANGER}[worst["severity"]]
+        sev_color = {1: WARN, 2: WARN, 3: DANGER}[worst["severity"]]
         # Attach the raw list so the UI can render clickable rows
         items.append({
             "category": "Incidents detected",
@@ -3063,7 +3069,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Match the colour of the base curve and pair with a dashed pen so the
         # eye can tell at-a-glance which-is-which.
         base_curve = self.curves.get(key)
-        col = "#fbbf24"  # default amber
+        col = WARN  # default amber
         if base_curve is not None:
             try:
                 col = base_curve.opts.get("pen").color().name()
@@ -3297,22 +3303,23 @@ class MainWindow(QtWidgets.QMainWindow):
         title_row = QtWidgets.QHBoxLayout()
         title_row.setSpacing(14)
         title_row.addStretch(1)
-        logo_lbl = QtWidgets.QLabel("◆")
+        logo_lbl = QtWidgets.QLabel("[ ◼ ]")
         logo_lbl.setStyleSheet(
-            f"color:{ACCENT}; font-size:30px; font-weight:600;"
+            f"color:{ACCENT}; font-size:18px; font-weight:600; letter-spacing:2px;"
+            f"font-family: 'JetBrains Mono', 'SF Mono', monospace;"
         )
         title_row.addWidget(logo_lbl)
         title_text_col = QtWidgets.QVBoxLayout()
         title_text_col.setSpacing(2)
-        title = QtWidgets.QLabel("UAV LOG VIEWER")
+        title = QtWidgets.QLabel("UAV LOG ANALYZER")
         title.setStyleSheet(
-            f"color:{TEXT}; font-size:30px; font-weight:900; letter-spacing:8px;"
-            f"font-family: 'Inter Display', 'Inter', 'Helvetica Neue', sans-serif;"
+            f"color:{TEXT}; font-size:24px; font-weight:600; letter-spacing:4px;"
+            f"font-family: 'Inter', 'Helvetica Neue', sans-serif;"
         )
         title_text_col.addWidget(title)
-        sub = QtWidgets.QLabel("ARDUPILOT TELEMETRY ANALYZER")
+        sub = QtWidgets.QLabel("ARDUPILOT TELEMETRY DIAGNOSTIC TOOL")
         sub.setStyleSheet(
-            f"color:{TEXT_DIM}; font-size:10px; letter-spacing:4px; font-weight:700;"
+            f"color:{TEXT_DIM}; font-size:10px; letter-spacing:3px; font-weight:600;"
         )
         title_text_col.addWidget(sub)
         title_row.addLayout(title_text_col)
@@ -3328,24 +3335,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.welcome_drop.setMaximumWidth(720)
         self.welcome_drop.setStyleSheet(
             f"QFrame {{"
-            f"  background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
-            f"    stop:0 rgba(34,211,238,0.06), stop:1 rgba(34,211,238,0.02));"
-            f"  border:2px dashed rgba(34,211,238,0.55);"
-            f"  border-radius:14px;"
+            f"  background: {BG_1};"
+            f"  border:1px dashed {BORDER};"
+            f"  border-radius:2px;"
             f"}}"
         )
         dl = QtWidgets.QVBoxLayout(self.welcome_drop)
         dl.setContentsMargins(48, 36, 48, 36)
         dl.setSpacing(10)
-        drop_icon = QtWidgets.QLabel("⇣")
+        drop_icon = QtWidgets.QLabel("▼")
         drop_icon.setStyleSheet(
-            f"color:{ACCENT}; font-size:46px; font-weight:300; line-height:1;"
+            f"color:{ACCENT}; font-size:28px; font-weight:400; line-height:1;"
         )
         drop_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         dl.addWidget(drop_icon)
-        drop_text = QtWidgets.QLabel("DROP A FLIGHT LOG HERE")
+        drop_text = QtWidgets.QLabel("DROP FLIGHT LOG TO LOAD")
         drop_text.setStyleSheet(
-            f"color:{TEXT}; font-size:15px; font-weight:800; letter-spacing:4px;"
+            f"color:{TEXT}; font-size:13px; font-weight:600; letter-spacing:3px;"
         )
         drop_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         dl.addWidget(drop_text)
@@ -4202,7 +4208,7 @@ class MainWindow(QtWidgets.QMainWindow):
             overall_color, overall_text = DANGER, "Needs attention"
             overall_blurb = "Some flight data points to issues that should be looked at before the next flight."
         elif n_marg > 0:
-            overall_color, overall_text = "#fbbf24", "Acceptable"
+            overall_color, overall_text = WARN, "Acceptable"
             overall_blurb = "The flight was usable, but a few things are on the marginal side."
         elif n_good > 0:
             overall_color, overall_text = SUCCESS, "Healthy flight"
@@ -4260,7 +4266,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Tally chips
         for label, count, col in (
             ("good", n_good, SUCCESS),
-            ("marginal", n_marg, "#fbbf24"),
+            ("marginal", n_marg, WARN),
             ("bad", n_bad, DANGER),
             ("info", n_info, ACCENT),
         ):
@@ -4564,11 +4570,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Per-axis (one plot row), one curve per IMU
         # IMU1 = solid bright, IMU2 = solid dimmed, IMU3 = dashed
-        axis_colors = {"X": "#22d3ee", "Y": "#a78bfa", "Z": "#fbbf24"}
+        axis_colors = {"X": "#22d3ee", "Y": "#a78bfa", "Z": WARN}
         line_styles = [
             ("IMU",  None,          1.6),  # solid
             ("IMU2", "#67e8f9",     1.4),  # dimmer cyan tint
-            ("IMU3", "#fbbf24",     1.2),  # dashed amber
+            ("IMU3", WARN,     1.2),  # dashed amber
         ]
         for k, axis_letter in enumerate(("X", "Y", "Z")):
             plot = self.fft_plots[k]
@@ -4692,7 +4698,7 @@ class MainWindow(QtWidgets.QMainWindow):
             plot = self.pid_plots[k]
             if actual in att:
                 plot.plot(x, np.asarray(att[actual], dtype=float),
-                          pen=pg.mkPen("#fbbf24", width=1.5), name=actual)
+                          pen=pg.mkPen(WARN, width=1.5), name=actual)
                 n_traces += 1
             if desired in att:
                 plot.plot(x, np.asarray(att[desired], dtype=float),
@@ -4712,8 +4718,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 for axis in ("roll", "pitch", "yaw"):
                     s = stats.get(axis)
                     if not s: continue
-                    badge = {"good": SUCCESS, "loose": "#fbbf24",
-                             "lagging": "#fbbf24", "oscillating": DANGER,
+                    badge = {"good": SUCCESS, "loose": WARN,
+                             "lagging": WARN, "oscillating": DANGER,
                              "no-command": TEXT_DIM}[s["verdict"]]
                     if s["verdict"] == "no-command":
                         lines.append(
@@ -4756,7 +4762,7 @@ class MainWindow(QtWidgets.QMainWindow):
         t_start = self.parsed.get("t_start") or 0.0
         x = np.asarray(rcou_t, dtype=float) - t_start
         # Per-motor traces — cycle through palette
-        palette = ["#22d3ee", "#fbbf24", "#34d399", "#f87171",
+        palette = ["#22d3ee", WARN, "#34d399", "#f87171",
                    "#a78bfa", "#f472b6", "#60a5fa", "#facc15"]
         motors = []   # list of (name, arr)
         for i, k in enumerate(ch_keys):
@@ -4847,7 +4853,7 @@ class MainWindow(QtWidgets.QMainWindow):
             verdict_color = SUCCESS
             verdict = f"GOOD · spread {spread:.0f} µs"
         elif spread < 120:
-            verdict_color = "#fbbf24"
+            verdict_color = WARN
             verdict = (f"MARGINAL · spread {spread:.0f} µs · "
                        f"suspect {worst_name} ({worst_sign}{worst_delta:.0f} µs, {worst_role})")
         else:
@@ -4878,7 +4884,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if abs(delta) < 30:
                 m_color = SUCCESS;  m_verdict = "ok"
             elif abs(delta) < 60:
-                m_color = "#fbbf24"; m_verdict = "watch"
+                m_color = WARN; m_verdict = "watch"
             else:
                 m_color = DANGER;   m_verdict = "working harder" if delta > 0 else "weaker / underloaded"
             sign = "+" if delta >= 0 else ""
