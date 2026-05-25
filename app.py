@@ -1547,6 +1547,20 @@ def analyze_pid_tracking(parsed: dict) -> dict:
         if m.sum() < 50:
             continue
         a = a[m]; d = d[m]; tt = t[m]
+        # Skip axes where the commanded signal is essentially flat — there's
+        # no real "tracking" to evaluate. This is especially common for yaw
+        # on ArduPlane (planes bank to turn, so DesYaw stays ~0 and the only
+        # measured "error" would be the plane's actual heading wandering).
+        if float(np.std(d)) < 1.0:
+            out[axis] = {
+                "rms_err": 0.0, "peak_err": 0.0,
+                "osc_hz": 0.0, "lag_ms": 0.0,
+                "verdict": "no-command",
+                "hint": (f"{axis.upper()} has no real command in this log "
+                         f"(desired is flat). On a plane this is normal for yaw — "
+                         f"the autopilot banks to turn instead of commanding heading."),
+            }
+            continue
         err = a - d
         # Yaw can wrap — unwrap relative angle
         if axis == "yaw":
@@ -2177,31 +2191,37 @@ def auto_review(parsed: dict) -> list[dict]:
     if pid_stats:
         worst_v = "good"
         lines: list[str] = []
+        # Worst-verdict precedence (worse wins)
+        rank = {"good": 0, "no-command": 0, "lagging": 1, "loose": 1, "oscillating": 2}
         for axis in ("roll", "pitch", "yaw"):
             s = pid_stats.get(axis)
             if not s:
                 continue
-            if s["verdict"] != "good":
-                if s["verdict"] == "oscillating":
-                    worst_v = "oscillating"
-                elif worst_v == "good":
-                    worst_v = s["verdict"]
-            badge = {"good": SUCCESS, "loose": "#fbbf24",
-                     "lagging": "#fbbf24", "oscillating": DANGER}[s["verdict"]]
-            lines.append(
-                f"<b style='color:{badge}'>{axis.upper():5s}</b> · "
-                f"RMS err {s['rms_err']:.1f}° · peak {s['peak_err']:.0f}° · "
-                f"err osc {s['osc_hz']:.1f} Hz · lag {s['lag_ms']:.0f} ms<br/>"
-                f"<span style='color:{TEXT_DIM}'>&nbsp;&nbsp;{s['hint']}</span>"
-            )
+            if rank.get(s["verdict"], 0) > rank.get(worst_v, 0):
+                worst_v = s["verdict"]
+            badge = {"good": SUCCESS, "loose": "#fbbf24", "lagging": "#fbbf24",
+                     "oscillating": DANGER, "no-command": TEXT_DIM}[s["verdict"]]
+            if s["verdict"] == "no-command":
+                lines.append(
+                    f"<b style='color:{badge}'>{axis.upper():5s}</b> · "
+                    f"<span style='color:{TEXT_DIM}'>{s['hint']}</span>"
+                )
+            else:
+                lines.append(
+                    f"<b style='color:{badge}'>{axis.upper():5s}</b> · "
+                    f"RMS err {s['rms_err']:.1f}° · peak {s['peak_err']:.0f}° · "
+                    f"err osc {s['osc_hz']:.1f} Hz · lag {s['lag_ms']:.0f} ms<br/>"
+                    f"<span style='color:{TEXT_DIM}'>&nbsp;&nbsp;{s['hint']}</span>"
+                )
         if lines:
-            verdict_lbl = {"good": "Good", "loose": "Marginal",
-                           "lagging": "Marginal", "oscillating": "Bad"}[worst_v]
-            verdict_clr = {"good": SUCCESS, "loose": "#fbbf24",
-                           "lagging": "#fbbf24", "oscillating": DANGER}[worst_v]
-            add("PID tracking", verdict_lbl, verdict_clr,
-                f"Attitude controller — {worst_v} tracking.",
-                "<br/>".join(lines))
+            verdict_lbl = {"good": "Good", "loose": "Marginal", "lagging": "Marginal",
+                           "oscillating": "Bad", "no-command": "Good"}[worst_v]
+            verdict_clr = {"good": SUCCESS, "loose": "#fbbf24", "lagging": "#fbbf24",
+                           "oscillating": DANGER, "no-command": SUCCESS}[worst_v]
+            tracked = sum(1 for s in pid_stats.values() if s["verdict"] != "no-command")
+            head = (f"Attitude controller — {worst_v} tracking "
+                    f"({tracked} axis/axes actively commanded).")
+            add("PID tracking", verdict_lbl, verdict_clr, head, "<br/>".join(lines))
 
     # ---------- CPU loop overruns ----------
     pm = data.get("PM")
@@ -4693,13 +4713,20 @@ class MainWindow(QtWidgets.QMainWindow):
                     s = stats.get(axis)
                     if not s: continue
                     badge = {"good": SUCCESS, "loose": "#fbbf24",
-                             "lagging": "#fbbf24", "oscillating": DANGER}[s["verdict"]]
-                    lines.append(
-                        f"&nbsp;&nbsp;<b style='color:{badge}'>{axis.upper():5s}</b> · "
-                        f"RMS {s['rms_err']:.1f}° · peak {s['peak_err']:.0f}° · "
-                        f"osc {s['osc_hz']:.1f} Hz · lag {s['lag_ms']:.0f} ms · "
-                        f"<span style='color:{TEXT_DIM}'>{s['hint']}</span>"
-                    )
+                             "lagging": "#fbbf24", "oscillating": DANGER,
+                             "no-command": TEXT_DIM}[s["verdict"]]
+                    if s["verdict"] == "no-command":
+                        lines.append(
+                            f"&nbsp;&nbsp;<b style='color:{badge}'>{axis.upper():5s}</b> · "
+                            f"<span style='color:{TEXT_DIM}'>{s['hint']}</span>"
+                        )
+                    else:
+                        lines.append(
+                            f"&nbsp;&nbsp;<b style='color:{badge}'>{axis.upper():5s}</b> · "
+                            f"RMS {s['rms_err']:.1f}° · peak {s['peak_err']:.0f}° · "
+                            f"osc {s['osc_hz']:.1f} Hz · lag {s['lag_ms']:.0f} ms · "
+                            f"<span style='color:{TEXT_DIM}'>{s['hint']}</span>"
+                        )
                 self.pid_info.setText("<br/>".join(lines))
             else:
                 self.pid_info.setText(header)
