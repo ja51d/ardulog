@@ -107,6 +107,8 @@ let plot = null
 
 function rebuildPlot() {
   if (!plotRef.value) return
+  const rect = plotRef.value.getBoundingClientRect()
+  if (rect.width < 100) return  // canvas not laid out yet — ResizeObserver will retry
   if (plot) { plot.destroy(); plot = null }
   const chs = channels.value
   if (!chs.length) return
@@ -119,7 +121,6 @@ function rebuildPlot() {
     series.push({ label: c.key, stroke: PALETTE[i % PALETTE.length], width: 1.2, points: { show: false } })
     data.push(c.arr)
   })
-  const rect = plotRef.value.getBoundingClientRect()
   plot = new uPlot({
     width: Math.max(400, rect.width),
     height: Math.max(280, rect.height),
@@ -140,8 +141,25 @@ function handleResize() {
   plot.setSize({ width: Math.max(400, r.width), height: Math.max(280, r.height) })
 }
 
-onMounted(() => { nextTick(rebuildPlot); window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (plot) plot.destroy() })
+let ro = null
+onMounted(() => {
+  nextTick(() => {
+    rebuildPlot()
+    if (typeof ResizeObserver !== 'undefined' && plotRef.value) {
+      ro = new ResizeObserver(() => {
+        if (!plot) rebuildPlot()
+        else handleResize()
+      })
+      ro.observe(plotRef.value)
+    }
+  })
+  window.addEventListener('resize', handleResize)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  if (ro) { ro.disconnect(); ro = null }
+  if (plot) plot.destroy()
+})
 watch(() => props.parsed, () => nextTick(rebuildPlot))
 </script>
 

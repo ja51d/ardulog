@@ -119,10 +119,11 @@ function buildSeriesData() {
 
 function rebuildPlot() {
   if (!plotRef.value) return
+  const rect = plotRef.value.getBoundingClientRect()
+  if (rect.width < 100) return  // canvas not laid out yet — ResizeObserver will retry
   if (plot) { plot.destroy(); plot = null }
   const built = buildSeriesData()
   if (!built) return
-  const rect = plotRef.value.getBoundingClientRect()
   const opts = {
     width: Math.max(400, rect.width),
     height: Math.max(300, rect.height),

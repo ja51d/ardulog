@@ -16,6 +16,10 @@ const plots = { roll: null, pitch: null, yaw: null }
 
 function buildOne(axis, refEl) {
   if (!refEl) return
+  // Don't build until the canvas actually has pixels — uPlot would draw
+  // at 0×0 and never recover. ResizeObserver retries once flex settles.
+  const rect = refEl.getBoundingClientRect()
+  if (rect.width < 100) return
   if (plots[axis]) { plots[axis].destroy(); plots[axis] = null }
   const att = props.parsed?.data?.ATT
   const attT = props.parsed?.times?.ATT
@@ -33,7 +37,6 @@ function buildOne(axis, refEl) {
     series.push({ label: 'command', stroke: '#4a90e2', width: 1.4, points: { show: false }, dash: [5, 4] })
     data.push(desired)
   }
-  const rect = refEl.getBoundingClientRect()
   plots[axis] = new uPlot({
     width: Math.max(400, rect.width),
     height: Math.max(140, rect.height),
@@ -67,7 +70,10 @@ function setupRO() {
   if (typeof ResizeObserver === 'undefined') return
   ro = new ResizeObserver(() => {
     handleResize()
-    if (!plots.roll && !plots.pitch && !plots.yaw) buildAll()
+    // Retry any axis that didn't get built (canvas was 0-width earlier)
+    if (!plots.roll)  buildOne('roll',  rollRef.value)
+    if (!plots.pitch) buildOne('pitch', pitchRef.value)
+    if (!plots.yaw)   buildOne('yaw',   yawRef.value)
   })
   for (const el of [rollRef.value, pitchRef.value, yawRef.value]) if (el) ro.observe(el)
 }

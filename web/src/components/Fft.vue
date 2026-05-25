@@ -62,11 +62,16 @@ function computeFft(signal, sampleHz) {
 const errorMsg = ref('')
 
 function buildOne(axis, refEl, color) {
-  if (!refEl) return
+  if (!refEl) return false
+  // Don't build until the canvas actually has pixels — uPlot would draw
+  // at 0×0 and the chart would never recover. ResizeObserver retries us
+  // once flex layout settles.
+  const rect = refEl.getBoundingClientRect()
+  if (rect.width < 100) return false
   if (plots[axis]) { plots[axis].destroy(); plots[axis] = null }
   const imu = props.parsed?.data?.IMU
   const t = props.parsed?.times?.IMU
-  if (!imu || !t?.length) { errorMsg.value = 'No IMU messages in this log.'; return }
+  if (!imu || !t?.length) { errorMsg.value = 'No IMU messages in this log.'; return true }
   // Estimate sample rate from median delta-t
   const dts = []
   for (let i = 1; i < Math.min(200, t.length); i++) dts.push(t[i] - t[i-1])
@@ -76,9 +81,9 @@ function buildOne(axis, refEl, color) {
   fs.value = sampleHz
   const key = { x: 'AccX', y: 'AccY', z: 'AccZ' }[axis]
   const sig = imu[key] || []
-  if (!sig.length) { errorMsg.value = `IMU.${key} not present in this log.`; return }
+  if (!sig.length) { errorMsg.value = `IMU.${key} not present in this log.`; return true }
   const sp = computeFft(sig, sampleHz)
-  if (!sp) { errorMsg.value = `Too few IMU samples for FFT (need ≥ 64).`; return }
+  if (!sp) { errorMsg.value = `Too few IMU samples for FFT (need ≥ 64).`; return true }
   // Find peak frequency (ignore DC / sub-2 Hz noise)
   let bi = 0, bv = -Infinity
   for (let i = 0; i < sp.freqs.length; i++) {
@@ -87,7 +92,6 @@ function buildOne(axis, refEl, color) {
   }
   peakHz.value[axis] = sp.freqs[bi]
 
-  const rect = refEl.getBoundingClientRect()
   plots[axis] = new uPlot({
     width: Math.max(400, rect.width),
     height: Math.max(140, rect.height),
@@ -103,6 +107,7 @@ function buildOne(axis, refEl, color) {
     cursor: { drag: { x: true, y: false } },
     scales: { x: { range: [0, sampleHz / 2] } },
   }, [Array.from(sp.freqs), Array.from(sp.mags)], refEl)
+  return true
 }
 
 function buildAll() {
@@ -113,15 +118,19 @@ function buildAll() {
 }
 
 // uPlot can render at 0×0 if the flex container hasn't sized yet on the
-// initial mount. ResizeObserver catches the layout pass and triggers a
-// rebuild once the canvases have real pixels.
+// initial mount. ResizeObserver catches the layout pass and rebuilds any
+// pane that hasn't been drawn yet once its canvas has real pixels.
 let ro = null
 function setupResizeObserver() {
   if (typeof ResizeObserver === 'undefined') return
   ro = new ResizeObserver(() => {
     handleResize()
-    // First-time build only fires if no plot yet exists
-    if (!plots.x && !plots.y && !plots.z) buildAll()
+    // Retry any axis that hasn't been plotted yet — buildOne refuses to
+    // create at <100 px wide, so it can come back as a no-op on first
+    // mount and needs to fire again once flex is settled.
+    if (!plots.x) buildOne('x', xRef.value, '#4a90e2')
+    if (!plots.y) buildOne('y', yRef.value, '#d9a14a')
+    if (!plots.z) buildOne('z', zRef.value, '#5dba7c')
   })
   for (const el of [xRef.value, yRef.value, zRef.value]) if (el) ro.observe(el)
 }
