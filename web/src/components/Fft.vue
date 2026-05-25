@@ -14,6 +14,7 @@ const DIM = '#7a8699'
 const xRef = ref(null), yRef = ref(null), zRef = ref(null)
 const plots = { x: null, y: null, z: null }
 const fs = ref(null), peakHz = ref({ x: 0, y: 0, z: 0 })
+const imuSource = ref(null)
 
 // Compute FFT magnitude in dB for one axis. Uses next-pow-of-2 size and
 // a Hann window. Returns { freqs: [Hz...], mags: [dB...], fs }.
@@ -61,6 +62,19 @@ function computeFft(signal, sampleHz) {
 
 const errorMsg = ref('')
 
+// Find the best IMU-like message in the parsed log. ArduPilot historically
+// has used IMU, IMU0, IMU1, IMU2, IMU3, IMT — we accept any of them.
+function pickImu(parsed) {
+  if (!parsed?.data) return { name: null, imu: null, times: null }
+  const candidates = ['IMU', 'IMU0', 'IMU1', 'IMU2', 'IMU3']
+  for (const name of candidates) {
+    const imu = parsed.data[name]
+    const t = parsed.times[name]
+    if (imu && t?.length && imu.AccX) return { name, imu, times: t }
+  }
+  return { name: null, imu: null, times: null }
+}
+
 function buildOne(axis, refEl, color) {
   if (!refEl) return false
   // Don't build until the canvas actually has pixels — uPlot would draw
@@ -69,9 +83,16 @@ function buildOne(axis, refEl, color) {
   const rect = refEl.getBoundingClientRect()
   if (rect.width < 100) return false
   if (plots[axis]) { plots[axis].destroy(); plots[axis] = null }
-  const imu = props.parsed?.data?.IMU
-  const t = props.parsed?.times?.IMU
-  if (!imu || !t?.length) { errorMsg.value = 'No IMU messages in this log.'; return true }
+  const { name: imuName, imu, times: t } = pickImu(props.parsed)
+  if (!imu || !t?.length) {
+    const avail = Object.keys(props.parsed?.data || {}).filter(k => /^IM[UT]/i.test(k))
+    errorMsg.value = avail.length
+      ? `No IMU.Acc{X,Y,Z} fields. Available IMU-ish message types: ${avail.join(', ')}.`
+      : 'No IMU messages in this log.'
+    return true
+  }
+  // Re-export so the banner can show which message we used
+  imuSource.value = imuName
   // Estimate sample rate from median delta-t
   const dts = []
   for (let i = 1; i < Math.min(200, t.length); i++) dts.push(t[i] - t[i-1])
@@ -160,7 +181,7 @@ watch(() => props.parsed, () => nextTick(buildAll))
     <div class="title">FFT · IMU ACCELERATION SPECTRUM PER AXIS</div>
     <div class="banner">
       <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
-      <div v-else-if="fs">Sample rate: <b>{{ fs.toFixed(0) }} Hz</b> (Nyquist {{ (fs/2).toFixed(0) }} Hz)</div>
+      <div v-else-if="fs">Source: <b>{{ imuSource }}</b> · Sample rate: <b>{{ fs.toFixed(0) }} Hz</b> (Nyquist {{ (fs/2).toFixed(0) }} Hz)</div>
       <div v-else>Open a log with IMU messages to see motor / airframe resonance peaks.</div>
       <div class="hint">Peaks near motor RPM/60 = resonance. Broad shoulders = airframe flex.</div>
     </div>
