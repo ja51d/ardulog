@@ -1507,6 +1507,107 @@ def detect_frame_kind(parsed: dict) -> str:
     return "other"
 
 
+def analyze_pid_tracking(parsed: dict) -> dict:
+    """Per-axis attitude-tracking analysis: how well does the actual angle
+    follow the commanded angle? Returns {'roll': {...}, 'pitch': {...},
+    'yaw': {...}} where each axis dict has:
+      rms_err   — RMS of (actual - desired) in degrees
+      peak_err  — peak |actual - desired|
+      osc_hz    — dominant oscillation frequency of the error (Hz, 0 = none)
+      lag_ms    — best-fit time delay between desired and actual (ms)
+      verdict   — 'good' | 'loose' | 'oscillating' | 'lagging' | 'no-data'
+      hint      — plain-English suggestion (which gain to nudge)"""
+    out = {}
+    att = (parsed.get("data") or {}).get("ATT")
+    att_t = (parsed.get("times") or {}).get("ATT")
+    if not att or att_t is None or len(att_t) < 50:
+        return out
+    t = np.asarray(att_t, dtype=float)
+    # Use only "armed and moving" samples if possible — keeps benchtop data out
+    stat = (parsed.get("data") or {}).get("STAT")
+    armed_mask = None
+    if stat and "Armed" in stat:
+        st = np.asarray((parsed.get("times") or {}).get("STAT", []), dtype=float)
+        sa = np.asarray(stat["Armed"], dtype=float)
+        if len(st) == len(sa) and len(st) > 1:
+            armed_mask = np.interp(t, st, sa) > 0.5
+    pairs = [("roll", "Roll", "DesRoll"),
+             ("pitch", "Pitch", "DesPitch"),
+             ("yaw",   "Yaw",   "DesYaw")]
+    for axis, actual, desired in pairs:
+        if actual not in att or desired not in att:
+            continue
+        a = np.asarray(att[actual], dtype=float)
+        d = np.asarray(att[desired], dtype=float)
+        if len(a) != len(t) or len(d) != len(t):
+            continue
+        m = np.isfinite(a) & np.isfinite(d)
+        if armed_mask is not None and armed_mask.shape == m.shape:
+            m &= armed_mask
+        if m.sum() < 50:
+            continue
+        a = a[m]; d = d[m]; tt = t[m]
+        err = a - d
+        # Yaw can wrap — unwrap relative angle
+        if axis == "yaw":
+            err = ((err + 180) % 360) - 180
+        rms_err = float(np.sqrt(np.mean(err ** 2)))
+        peak_err = float(np.nanmax(np.abs(err)))
+        # Oscillation frequency: count zero-crossings of (err - mean(err))
+        e0 = err - np.mean(err)
+        signs = np.sign(e0)
+        crossings = int(np.sum(np.abs(np.diff(signs)) > 1))
+        duration = float(tt[-1] - tt[0])
+        osc_hz = (crossings / 2.0) / duration if duration > 0 else 0.0
+        # Lag: best-fit shift of desired to align with actual (cross-correlate,
+        # search up to 250 ms of shift)
+        try:
+            dt = float(np.median(np.diff(tt))) or 0.02
+            max_shift = int(0.25 / dt)
+            best_shift = 0; best_corr = -1e9
+            d_c = d - np.mean(d); a_c = a - np.mean(a)
+            for s in range(0, max_shift + 1):
+                if s == 0:
+                    c = float(np.dot(d_c, a_c))
+                else:
+                    c = float(np.dot(d_c[:-s], a_c[s:]))
+                if c > best_corr:
+                    best_corr = c; best_shift = s
+            lag_ms = best_shift * dt * 1000.0
+        except Exception:
+            lag_ms = 0.0
+        # Verdict
+        # Oscillation: more than ~3 Hz on the error usually means P too high
+        # (rate-loop ringing manifests as zero-crossings of error around mean).
+        if osc_hz > 4.0 and rms_err > 1.5:
+            verdict = "oscillating"
+            hint = (f"{axis.upper()} error oscillates at ~{osc_hz:.1f} Hz — "
+                    f"P gain likely too high. Reduce *_RATE_P by ~20%.")
+        elif rms_err > 8.0:
+            verdict = "loose"
+            hint = (f"{axis.upper()} tracking is loose (RMS {rms_err:.1f}°). "
+                    f"Increase *_RATE_P by ~20% or check FF gain.")
+        elif rms_err > 4.0 or peak_err > 25:
+            verdict = "loose"
+            hint = (f"{axis.upper()} tracks but with delay/overshoot. "
+                    f"Consider small P bump or check that *_RATE_I isn't 0.")
+        elif lag_ms > 150 and rms_err > 2.0:
+            verdict = "lagging"
+            hint = (f"{axis.upper()} lags command by ~{lag_ms:.0f} ms — "
+                    f"raise *_RATE_P or *_RATE_D slightly.")
+        else:
+            verdict = "good"
+            hint = (f"{axis.upper()} tracks well "
+                    f"(RMS {rms_err:.1f}°, peak {peak_err:.0f}°, "
+                    f"{osc_hz:.1f} Hz, lag {lag_ms:.0f} ms).")
+        out[axis] = {
+            "rms_err": rms_err, "peak_err": peak_err,
+            "osc_hz": osc_hz, "lag_ms": lag_ms,
+            "verdict": verdict, "hint": hint,
+        }
+    return out
+
+
 def auto_review(parsed: dict) -> list[dict]:
     """Run a plain-English health check across the parsed log.
     Returns a list of {category, verdict, color, headline, detail} dicts."""
@@ -1583,6 +1684,11 @@ def auto_review(parsed: dict) -> list[dict]:
             "Checks throttle ramp speed (torque-roll risk), rotation airspeed "
             "vs stall, roll divergence from commanded, compass interference "
             "under load, and key TKOFF_* parameter values.",
+        "PID tracking":
+            "Compares commanded (DesRoll/DesPitch/DesYaw) with actual "
+            "(Roll/Pitch/Yaw) from the ATT message. Loose tracking → raise "
+            "P gain. Oscillation on the error signal → lower P gain. Lag "
+            "without oscillation → raise D slightly or check feed-forward.",
         "CPU loop overruns":
             "ArduPilot's main control loop runs at a fixed rate (plane 50 Hz "
             "= 20 000 µs / loop, copter 400 Hz = 2 500 µs / loop). If a loop "
@@ -2065,6 +2171,37 @@ def auto_review(parsed: dict) -> list[dict]:
                     color = SUCCESS if worst_sev == 0 else ("#fbbf24" if worst_sev == 1 else DANGER)
                     headline = f"{len(takeoff_windows)} TAKEOFF mode entry / entries analysed."
                     add("Takeoff health", verdict, color, headline, detail_html)
+
+    # ---------- PID tracking quality ----------
+    pid_stats = analyze_pid_tracking(parsed)
+    if pid_stats:
+        worst_v = "good"
+        lines: list[str] = []
+        for axis in ("roll", "pitch", "yaw"):
+            s = pid_stats.get(axis)
+            if not s:
+                continue
+            if s["verdict"] != "good":
+                if s["verdict"] == "oscillating":
+                    worst_v = "oscillating"
+                elif worst_v == "good":
+                    worst_v = s["verdict"]
+            badge = {"good": SUCCESS, "loose": "#fbbf24",
+                     "lagging": "#fbbf24", "oscillating": DANGER}[s["verdict"]]
+            lines.append(
+                f"<b style='color:{badge}'>{axis.upper():5s}</b> · "
+                f"RMS err {s['rms_err']:.1f}° · peak {s['peak_err']:.0f}° · "
+                f"err osc {s['osc_hz']:.1f} Hz · lag {s['lag_ms']:.0f} ms<br/>"
+                f"<span style='color:{TEXT_DIM}'>&nbsp;&nbsp;{s['hint']}</span>"
+            )
+        if lines:
+            verdict_lbl = {"good": "Good", "loose": "Marginal",
+                           "lagging": "Marginal", "oscillating": "Bad"}[worst_v]
+            verdict_clr = {"good": SUCCESS, "loose": "#fbbf24",
+                           "lagging": "#fbbf24", "oscillating": DANGER}[worst_v]
+            add("PID tracking", verdict_lbl, verdict_clr,
+                f"Attitude controller — {worst_v} tracking.",
+                "<br/>".join(lines))
 
     # ---------- CPU loop overruns ----------
     pm = data.get("PM")
@@ -4544,11 +4681,28 @@ class MainWindow(QtWidgets.QMainWindow):
         if n_traces == 0:
             self.pid_info.setText("  ATT has no Roll/Pitch/Yaw — incompatible log.")
         else:
-            self.pid_info.setText(
-                "  Cyan dashed = pilot/autopilot command.  Amber solid = vehicle response."
-                "  Large gap → controller can't keep up (loose tuning)."
-                "  Oscillation around command → gain too high."
+            self.pid_info.setTextFormat(Qt.TextFormat.RichText)
+            stats = analyze_pid_tracking(self.parsed)
+            header = (
+                "  Cyan dashed = command  ·  Amber solid = vehicle response  ·  "
+                "Big gap = loose tuning, ringing = P too high"
             )
+            if stats:
+                lines = [header]
+                for axis in ("roll", "pitch", "yaw"):
+                    s = stats.get(axis)
+                    if not s: continue
+                    badge = {"good": SUCCESS, "loose": "#fbbf24",
+                             "lagging": "#fbbf24", "oscillating": DANGER}[s["verdict"]]
+                    lines.append(
+                        f"&nbsp;&nbsp;<b style='color:{badge}'>{axis.upper():5s}</b> · "
+                        f"RMS {s['rms_err']:.1f}° · peak {s['peak_err']:.0f}° · "
+                        f"osc {s['osc_hz']:.1f} Hz · lag {s['lag_ms']:.0f} ms · "
+                        f"<span style='color:{TEXT_DIM}'>{s['hint']}</span>"
+                    )
+                self.pid_info.setText("<br/>".join(lines))
+            else:
+                self.pid_info.setText(header)
 
     # ----- Motors tab -----
     def _populate_motors(self):
