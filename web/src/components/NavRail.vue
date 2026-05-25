@@ -17,7 +17,7 @@ const SECTIONS = [
     { key: 'fft',      label: 'FFT',        icon: '≋', soon: true },
     { key: 'pid',      label: 'PID TUNING', icon: '∿', soon: true },
     { key: 'motors',   label: 'MOTORS',     icon: '◰', soon: true },
-    { key: 'review',   label: 'REVIEW',     icon: '◇', soon: true },
+    { key: 'review',   label: 'REVIEW',     icon: '◇' },
   ]},
   { title: 'DATA', items: [
     { key: 'params',   label: 'PARAMS',     icon: '☰', soon: true },

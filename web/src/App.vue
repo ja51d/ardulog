@@ -6,6 +6,7 @@ import DropZone from './components/DropZone.vue'
 import MetricsStrip from './components/MetricsStrip.vue'
 import NavRail from './components/NavRail.vue'
 import LogSummary from './components/LogSummary.vue'
+import Review from './components/Review.vue'
 
 const parsed = ref(null)
 const error = ref(null)
@@ -73,6 +74,7 @@ const frame = computed(() => parsed.value ? detectFrameKind(parsed.value).toUppe
           </div>
         </div>
         <LogSummary v-else-if="activeTab === 'summary'" :parsed="parsed" :frame="frame" />
+        <Review v-else-if="activeTab === 'review'" :parsed="parsed" />
         <div v-else class="placeholder">
           <div class="placeholder-title">{{ activeTab.toUpperCase() }}</div>
           <div class="placeholder-sub">This view is part of phase 2. The desktop app has it today;
