@@ -75,24 +75,31 @@ function pickImu(parsed) {
   return { name: null, imu: null, times: null }
 }
 
+// Check what's available in the log up-front. This runs even if the
+// canvases aren't laid out yet, so the banner shows a useful diagnostic.
+function checkData() {
+  const { name, imu, times: t } = pickImu(props.parsed)
+  if (!imu || !t?.length) {
+    const allTypes = Object.keys(props.parsed?.data || {})
+    const imuish = allTypes.filter(k => /^(IMU|IMT|INS|RAW_IMU)/i.test(k))
+    errorMsg.value = imuish.length
+      ? `Found ${imuish.join(', ')} but no Acc{X,Y,Z} fields. ` +
+        `Sample fields in ${imuish[0]}: ${Object.keys(props.parsed.data[imuish[0]] || {}).slice(0, 12).join(', ')}.`
+      : `No IMU messages in this log. Top message types: ${allTypes.slice(0, 10).join(', ')}.`
+    return null
+  }
+  imuSource.value = name
+  return { imu, t }
+}
+
 function buildOne(axis, refEl, color) {
   if (!refEl) return false
-  // Don't build until the canvas actually has pixels — uPlot would draw
-  // at 0×0 and the chart would never recover. ResizeObserver retries us
-  // once flex layout settles.
   const rect = refEl.getBoundingClientRect()
-  if (rect.width < 100) return false
+  if (rect.width < 100) return false  // canvas not laid out yet — observer retries
   if (plots[axis]) { plots[axis].destroy(); plots[axis] = null }
-  const { name: imuName, imu, times: t } = pickImu(props.parsed)
-  if (!imu || !t?.length) {
-    const avail = Object.keys(props.parsed?.data || {}).filter(k => /^IM[UT]/i.test(k))
-    errorMsg.value = avail.length
-      ? `No IMU.Acc{X,Y,Z} fields. Available IMU-ish message types: ${avail.join(', ')}.`
-      : 'No IMU messages in this log.'
-    return true
-  }
-  // Re-export so the banner can show which message we used
-  imuSource.value = imuName
+  const picked = checkData()
+  if (!picked) return true
+  const { imu, t } = picked
   // Estimate sample rate from median delta-t
   const dts = []
   for (let i = 1; i < Math.min(200, t.length); i++) dts.push(t[i] - t[i-1])
@@ -133,6 +140,9 @@ function buildOne(axis, refEl, color) {
 
 function buildAll() {
   errorMsg.value = ''
+  // Run the data check first so the banner has a diagnostic even before
+  // (or if) the canvases get sized.
+  checkData()
   buildOne('x', xRef.value, '#4a90e2')
   buildOne('y', yRef.value, '#d9a14a')
   buildOne('z', zRef.value, '#5dba7c')
