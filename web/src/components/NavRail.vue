@@ -8,8 +8,8 @@ const emit = defineEmits(['update:active'])
 const SECTIONS = [
   { title: 'VISUALIZE', items: [
     { key: 'summary',  label: 'SUMMARY',    icon: '◐' },
-    { key: 'plot',     label: 'PLOT',       icon: '∿', soon: true },
-    { key: 'map',      label: 'MAP',        icon: '◎', soon: true },
+    { key: 'plot',     label: 'PLOT',       icon: '∿' },
+    { key: 'map',      label: 'MAP',        icon: '◎' },
     { key: '3d',       label: '3D',         icon: '◢', soon: true },
     { key: 'cockpit',  label: 'COCKPIT',    icon: '◉', soon: true },
   ]},
@@ -20,7 +20,7 @@ const SECTIONS = [
     { key: 'review',   label: 'REVIEW',     icon: '◇' },
   ]},
   { title: 'DATA', items: [
-    { key: 'params',   label: 'PARAMS',     icon: '☰', soon: true },
+    { key: 'params',   label: 'PARAMS',     icon: '☰' },
     { key: 'info',     label: 'INFO',       icon: 'ⓘ', soon: true },
   ]},
 ]

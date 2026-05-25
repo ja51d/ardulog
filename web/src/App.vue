@@ -7,6 +7,9 @@ import MetricsStrip from './components/MetricsStrip.vue'
 import NavRail from './components/NavRail.vue'
 import LogSummary from './components/LogSummary.vue'
 import Review from './components/Review.vue'
+import Params from './components/Params.vue'
+import MapView from './components/MapView.vue'
+import Plot from './components/Plot.vue'
 
 const parsed = ref(null)
 const error = ref(null)
@@ -74,7 +77,10 @@ const frame = computed(() => parsed.value ? detectFrameKind(parsed.value).toUppe
           </div>
         </div>
         <LogSummary v-else-if="activeTab === 'summary'" :parsed="parsed" :frame="frame" />
-        <Review v-else-if="activeTab === 'review'" :parsed="parsed" />
+        <Review    v-else-if="activeTab === 'review'"  :parsed="parsed" />
+        <Params    v-else-if="activeTab === 'params'"  :parsed="parsed" />
+        <MapView   v-else-if="activeTab === 'map'"     :parsed="parsed" />
+        <Plot      v-else-if="activeTab === 'plot'"    :parsed="parsed" />
         <div v-else class="placeholder">
           <div class="placeholder-title">{{ activeTab.toUpperCase() }}</div>
           <div class="placeholder-sub">This view is part of phase 2. The desktop app has it today;
