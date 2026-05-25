@@ -2695,11 +2695,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if event.type() == QtCore.QEvent.Type.WindowStateChange:
             QtCore.QTimer.singleShot(50, self._refresh_web_views)
 
-    def resizeEvent(self, event):
-        """Same fix as changeEvent — drag-resizing also blanks WebEngine
-        on some macOS / Qt versions."""
-        super().resizeEvent(event)
-        QtCore.QTimer.singleShot(0, self._refresh_web_views)
+    # NOTE: resizeEvent is implemented further down where the loading
+    # overlay also needs to be repositioned.
 
     def _on_nav_changed(self, current, _previous):
         if current is None: return
@@ -4155,6 +4152,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.clear_plot()
         self.info_text.clear()
         self._push_recent(path)
+        self._show_loading_overlay(path)
         self.worker = LogParseWorker(path)
         self.worker.progress.connect(self._on_progress)
         self.worker.done.connect(self._on_parsed)
@@ -4162,13 +4160,112 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker.start()
 
     def _on_progress(self, count: int, mtype: str):
-        self.statusBar().showMessage(f"Parsed {count:,} messages… (last: {mtype})")
+        msg = f"Parsed {count:,} messages… (last: {mtype})"
+        self.statusBar().showMessage(msg)
+        if getattr(self, "_loading_overlay", None) is not None:
+            self._loading_count.setText(f"{count:,} messages parsed")
+            self._loading_type.setText(f"last type:  {mtype}")
 
     def _on_error(self, msg: str):
         self.statusBar().showMessage("Parse failed.")
+        self._hide_loading_overlay()
         QtWidgets.QMessageBox.critical(self, "Parse error", msg)
 
+    # ----- Loading overlay -----
+    def _show_loading_overlay(self, path: str):
+        """Centered busy-state panel shown while a .bin parses. Keeps the
+        user oriented during multi-second loads — the worker emits progress
+        updates that we render here."""
+        if getattr(self, "_loading_overlay", None) is not None:
+            self._hide_loading_overlay()
+        # Parent overlay to the centralWidget so it doesn't move with menus.
+        host = self.centralWidget() or self
+        ov = QtWidgets.QFrame(host)
+        ov.setObjectName("loadingOverlay")
+        ov.setStyleSheet(
+            f"QFrame#loadingOverlay {{ background: rgba(11,17,24,0.78); }}"
+        )
+        ov.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        # Center card
+        card = QtWidgets.QFrame(ov)
+        card.setObjectName("loadingCard")
+        card.setStyleSheet(
+            f"QFrame#loadingCard {{ background:{BG_1}; border:1px solid {BORDER};"
+            f" border-left: 3px solid {ACCENT}; border-radius:2px; }}"
+        )
+        cl = QtWidgets.QVBoxLayout(card)
+        cl.setContentsMargins(36, 26, 36, 26)
+        cl.setSpacing(8)
+        kicker = QtWidgets.QLabel("PARSING LOG")
+        kicker.setStyleSheet(
+            f"color:{ACCENT}; font-size:11px; letter-spacing:3px; font-weight:700;"
+            f"font-family: 'JetBrains Mono', 'SF Mono', monospace;"
+        )
+        cl.addWidget(kicker)
+        fname = QtWidgets.QLabel(Path(path).name)
+        fname.setStyleSheet(
+            f"color:{TEXT}; font-size:14px; font-weight:600;"
+            f"font-family: 'JetBrains Mono', 'SF Mono', monospace;"
+        )
+        cl.addWidget(fname)
+        # Busy bar (indeterminate)
+        bar = QtWidgets.QProgressBar()
+        bar.setRange(0, 0)
+        bar.setTextVisible(False)
+        bar.setFixedHeight(4)
+        bar.setStyleSheet(
+            f"QProgressBar {{ background:{BG_2}; border:1px solid {BORDER};"
+            f" border-radius:0; }}"
+            f"QProgressBar::chunk {{ background:{ACCENT}; }}"
+        )
+        cl.addWidget(bar)
+        self._loading_count = QtWidgets.QLabel("0 messages parsed")
+        self._loading_count.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-family: 'JetBrains Mono', monospace;"
+        )
+        cl.addWidget(self._loading_count)
+        self._loading_type = QtWidgets.QLabel("last type:  —")
+        self._loading_type.setStyleSheet(
+            f"color:{TEXT_DIM}; font-size:11px; font-family: 'JetBrains Mono', monospace;"
+        )
+        cl.addWidget(self._loading_type)
+        hint = QtWidgets.QLabel("Large logs can take a few seconds — this is normal.")
+        hint.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px; padding-top:4px;")
+        cl.addWidget(hint)
+
+        # Center card inside overlay
+        ov_layout = QtWidgets.QHBoxLayout(ov)
+        ov_layout.addStretch(1)
+        v = QtWidgets.QVBoxLayout()
+        v.addStretch(1); v.addWidget(card); v.addStretch(1)
+        ov_layout.addLayout(v)
+        ov_layout.addStretch(1)
+
+        ov.resize(host.size())
+        ov.raise_()
+        ov.show()
+        self._loading_overlay = ov
+
+    def _hide_loading_overlay(self):
+        ov = getattr(self, "_loading_overlay", None)
+        if ov is not None:
+            ov.hide()
+            ov.deleteLater()
+            self._loading_overlay = None
+            self._loading_count = None
+            self._loading_type = None
+
+    def resizeEvent(self, event):
+        # (Re)size the loading overlay to match the window when it's open
+        super().resizeEvent(event)
+        QtCore.QTimer.singleShot(0, self._refresh_web_views)
+        ov = getattr(self, "_loading_overlay", None)
+        if ov is not None:
+            host = self.centralWidget() or self
+            ov.resize(host.size())
+
     def _on_parsed(self, result: dict):
+        self._hide_loading_overlay()
         self.parsed = result
         # Make the plot axis show wall-clock Istanbul time without losing
         # float precision (X values stay as small "seconds since log start").
