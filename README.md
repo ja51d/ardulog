@@ -77,7 +77,7 @@ Built and deployed with [Vercel](https://vercel.com) → `vercel --prod`.
 
 ---
 
-## Credits
+## About me
 
 Built by **Javid** ([@ja51d](https://github.com/ja51d)) — astronautics engineer and UAV builder.
 Inspired by [plot.ardupilot.org](https://plot.ardupilot.org/) and the brilliant ArduPilot community.
