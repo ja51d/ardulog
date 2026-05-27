@@ -74,13 +74,26 @@ const overall = computed(() => {
 .review { display: flex; flex-direction: column; gap: 12px; }
 
 .score-card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 16px 20px;
-  background: var(--bg-1);
+  gap: 22px;
+  padding: 20px 24px;
+  background: linear-gradient(180deg, var(--panel-from) 0%, var(--panel-to) 100%);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+.score-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--grad-accent);
+  box-shadow: 0 0 14px rgba(61,169,252,0.5);
 }
 .score-card .icon {
   font-size: 22px;
@@ -108,13 +121,25 @@ const overall = computed(() => {
 }
 .tally { display: flex; gap: 8px; }
 .chip {
-  background: var(--bg-2);
+  position: relative;
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  padding: 6px 12px 8px;
-  min-width: 64px;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px 10px;
+  min-width: 68px;
   text-align: center;
+  overflow: hidden;
+  transition: border-color 200ms, transform 200ms;
 }
+.chip::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--grad-accent);
+  opacity: 0.6;
+}
+.chip:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 .chip .num {
   font-family: var(--font-mono);
   font-size: 22px;
@@ -137,12 +162,24 @@ const overall = computed(() => {
 }
 
 .card {
-  background: var(--bg-1);
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-from) 0%, var(--panel-to) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  padding: 14px 18px 14px 22px;
+  transition: border-color 180ms var(--ease-out), transform 180ms var(--ease-out);
+  overflow: hidden;
 }
-.card:hover { background: var(--bg-2); }
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+.card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 .card-top {
   display: flex;
   align-items: center;

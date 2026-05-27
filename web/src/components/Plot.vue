@@ -61,6 +61,36 @@ function toggleField(typeName, fieldName) {
 
 function clearAll() { selected.value = new Map() }
 
+// Export the currently-selected fields as CSV. Uses the same time alignment
+// the plot uses (nearest-neighbor to the densest series).
+function exportCsv() {
+  const built = buildSeriesData()
+  if (!built) return
+  const { data, series } = built
+  // Build headers
+  const keys = [...selected.value.keys()]
+  const headers = ['time_s', ...keys]
+  const rows = [headers.join(',')]
+  const xs = data[0]
+  const n = xs.length
+  for (let i = 0; i < n; i++) {
+    const row = [Number(xs[i]).toFixed(3)]
+    for (let s = 1; s < data.length; s++) {
+      const v = data[s][i]
+      row.push(v == null || !Number.isFinite(v) ? '' : Number(v).toString())
+    }
+    rows.push(row.join(','))
+  }
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const ts = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+  a.href = url
+  a.download = `ardulog-plot-${ts}.csv`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 // --- Plot ---
 const plotRef = ref(null)
 let plot = null
@@ -202,6 +232,7 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
       <div class="plot-header">
         <div class="count">{{ selected.size }} series</div>
         <div class="grow"></div>
+        <button v-if="selected.size" class="csv" @click="exportCsv" title="Download selected series as CSV">⤓ CSV</button>
         <button v-if="selected.size" class="clear" @click="clearAll">× CLEAR ALL</button>
       </div>
       <div ref="plotRef" class="plot-canvas">
@@ -231,6 +262,16 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
   gap: 6px;
   min-height: 0;
 }
+
+/* ===== Mobile ===== */
+@media (max-width: 768px) {
+  .plot-tab { flex-direction: column; gap: 8px; }
+  .messages {
+    width: 100%;
+    max-height: 38vh;
+  }
+  .plot-canvas { min-height: 280px; }
+}
 .m-header {
   color: var(--text-dim);
   font-size: 10px;
@@ -240,21 +281,31 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
   border-bottom: 1px solid var(--border);
 }
 .m-search {
-  background: var(--bg-2);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 11px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   outline: none;
+  border-radius: var(--radius-sm);
+  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
 }
-.m-search:focus { border-color: var(--accent); }
+.m-search::placeholder { color: var(--text-mute); }
+.m-search:focus {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 3px rgba(61,169,252,0.12);
+}
 .m-tree {
   flex: 1;
   overflow: auto;
   border: 1px solid var(--border);
-  background: var(--bg-1);
-  padding: 4px 0;
+  background: linear-gradient(180deg, var(--panel-from) 0%, var(--panel-to) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
   min-height: 0;
 }
 .type-row {
@@ -271,15 +322,21 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
   font-size: 11px;
   text-align: left;
 }
-.type-row:hover { background: var(--bg-2); }
-.caret { color: var(--text-dim); width: 10px; }
+.type-row {
+  border-radius: var(--radius-sm);
+  margin: 1px 4px;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out);
+}
+.type-row:hover { background: var(--surface-2); color: var(--accent-2); }
+.caret { color: var(--text-mute); width: 10px; }
 .type-name { flex: 1; }
 .type-count {
   color: var(--text-dim);
   font-size: 10px;
-  background: var(--bg-2);
-  padding: 1px 6px;
+  background: var(--surface-2);
+  padding: 1px 7px;
   border: 1px solid var(--border);
+  border-radius: 999px;
 }
 .fields { padding: 2px 0 6px; }
 .field-row {
@@ -296,8 +353,14 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
   font-size: 11px;
   text-align: left;
 }
-.field-row:hover { color: var(--text); background: var(--bg-2); }
-.field-row.active { color: var(--accent); }
+.field-row {
+  border-radius: var(--radius-sm);
+  margin: 1px 4px 1px 24px;
+  padding: 4px 10px;
+  transition: background 120ms var(--ease-out), color 120ms var(--ease-out);
+}
+.field-row:hover { color: var(--text); background: var(--surface-2); }
+.field-row.active { color: var(--accent-2); background: var(--accent-soft); }
 .check { width: 12px; }
 
 /* Plot pane */
@@ -322,22 +385,42 @@ watch(() => props.parsed, () => nextTick(rebuildPlot))
 }
 .plot-header .grow { flex: 1; }
 .plot-header .clear {
-  background: var(--bg-2);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   color: var(--text-dim);
   font-family: var(--font-mono);
   font-size: 10px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   letter-spacing: 1px;
   cursor: pointer;
+  border-radius: 999px;
+  transition: color 160ms var(--ease-out), border-color 160ms var(--ease-out), background 160ms var(--ease-out);
 }
-.plot-header .clear:hover { color: var(--danger); border-color: var(--danger); }
+.plot-header .clear:hover { color: var(--danger); border-color: rgba(248,113,113,0.5); background: rgba(248,113,113,0.08); }
+.plot-header .csv {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 6px 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: color 160ms, border-color 160ms, background 160ms;
+}
+.plot-header .csv:hover { color: var(--accent-2); border-color: var(--accent); background: var(--accent-soft); }
 .plot-canvas {
   flex: 1;
   border: 1px solid var(--border);
-  background: var(--bg-1);
+  background: linear-gradient(180deg, var(--panel-from) 0%, var(--panel-to) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   position: relative;
   min-height: 360px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 .hint {
   position: absolute; top: 50%; left: 50%;

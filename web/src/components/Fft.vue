@@ -80,14 +80,23 @@ function pickImu(parsed) {
 function checkData() {
   imuSource.value = null
   fs.value = null
+  if (!props.parsed?.data) {
+    errorMsg.value = 'No parsed log yet — load a .bin/.tlog/.log file from the home tab.'
+    return null
+  }
   const { name, imu, times: t } = pickImu(props.parsed)
   if (!imu || !t?.length) {
-    const allTypes = Object.keys(props.parsed?.data || {})
-    const imuish = allTypes.filter(k => /^(IMU|IMT|INS|RAW_IMU)/i.test(k))
-    errorMsg.value = imuish.length
-      ? `Found ${imuish.join(', ')} but no Acc{X,Y,Z} fields. ` +
-        `Sample fields in ${imuish[0]}: ${Object.keys(props.parsed.data[imuish[0]] || {}).slice(0, 12).join(', ')}.`
-      : `No IMU messages in this log. Top message types: ${allTypes.slice(0, 10).join(', ')}.`
+    const allTypes = Object.keys(props.parsed.data)
+    const imuish = allTypes.filter(k => /^(IMU|IMT|INS|RAW_IMU|ACC|GYR)/i.test(k))
+    if (imuish.length) {
+      const sampleType = imuish[0]
+      const fields = Object.keys(props.parsed.data[sampleType] || {})
+      errorMsg.value = `Found ${imuish.join(', ')} but no AccX/Y/Z fields. ` +
+        `Fields in ${sampleType}: ${fields.slice(0, 16).join(', ')}${fields.length > 16 ? '…' : ''}.`
+    } else {
+      errorMsg.value = `No IMU messages in this log (${allTypes.length} message types parsed). ` +
+        `Types include: ${allTypes.slice(0, 20).join(', ')}${allTypes.length > 20 ? '…' : ''}.`
+    }
     return null
   }
   imuSource.value = name

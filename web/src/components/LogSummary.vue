@@ -17,7 +17,6 @@ const typeCount = computed(() => Object.keys(props.parsed.data || {}).length)
 
 <template>
   <div class="wrap">
-    <!-- Status card -->
     <div class="card">
       <div class="head">
         <div class="kicker">LOG PARSED</div>
@@ -31,7 +30,6 @@ const typeCount = computed(() => Object.keys(props.parsed.data || {}).length)
       </div>
     </div>
 
-    <!-- Top message types -->
     <div class="card">
       <div class="head">
         <div class="kicker">TOP MESSAGE TYPES</div>
@@ -49,11 +47,10 @@ const typeCount = computed(() => Object.keys(props.parsed.data || {}).length)
       </table>
     </div>
 
-    <!-- Phase note -->
     <div class="phase-note">
-      <b>PHASE 1 LIVE.</b>
-      The .bin parser runs entirely in your browser. Next sessions will port the
-      PLOT, REVIEW, MOTORS, PARAMS, 3D, and Cockpit views from the desktop app.
+      <b>100% LOCAL.</b>
+      Every byte of this log was parsed in your browser — nothing was uploaded.
+      Use the rail on the left to explore plots, map, 3D playback, motors, PID tuning, FFT, and more.
     </div>
   </div>
 </template>
@@ -62,76 +59,103 @@ const typeCount = computed(() => Object.keys(props.parsed.data || {}).length)
 .wrap { display: flex; flex-direction: column; gap: 14px; }
 
 .card {
-  background: var(--bg-1);
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-from) 0%, var(--panel-to) 100%);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  padding: 18px 22px;
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
-.head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
-.kicker {
-  color: var(--text-dim);
-  font-size: 10px;
-  letter-spacing: 2.5px;
-  font-weight: 700;
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--grad-accent);
+  box-shadow: 0 0 14px rgba(61,169,252,0.5);
 }
+.head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.kicker { color: var(--text-mute); font-size: 10px; letter-spacing: 2.5px; font-weight: 700; }
 .verdict {
-  color: var(--accent);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 2px;
+  font-size: 18px; font-weight: 700; letter-spacing: 2px;
   font-family: var(--font-mono);
+  background: var(--grad-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.hint {
-  color: var(--text-dim);
-  font-size: 11px;
-  font-family: var(--font-mono);
-}
+.hint { color: var(--text-dim); font-size: 11px; font-family: var(--font-mono); }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 .stat {
-  background: var(--bg-2);
+  position: relative;
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  transition: border-color 200ms var(--ease-out), transform 200ms var(--ease-out), background 200ms var(--ease-out);
+  overflow: hidden;
 }
-.stat .k { color: var(--text-dim); font-size: 9px; font-weight: 700; letter-spacing: 2px; }
-.stat .v { color: var(--text); font-family: var(--font-mono); font-size: 18px; margin-top: 4px; font-weight: 600; }
+.stat::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--grad-accent);
+  opacity: 0.55;
+}
+.stat:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  background: var(--surface-2);
+}
+.stat .k { color: var(--text-mute); font-size: 9px; font-weight: 700; letter-spacing: 2px; }
+.stat .v { color: var(--text); font-family: var(--font-mono); font-size: 20px; margin-top: 6px; font-weight: 700; letter-spacing: 0.5px; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, td {
-  text-align: left;
-  padding: 6px 10px;
+  text-align: left; padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
+tbody tr { transition: background 120ms var(--ease-out); }
+tbody tr:hover td { background: var(--surface-1); }
 th {
-  background: var(--bg-2);
-  color: var(--text-dim);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-mute);
+  font-size: 9px; font-weight: 700; letter-spacing: 1.8px;
+  border-bottom: 1px solid var(--border-strong);
 }
 .r { text-align: right; }
 .mono { font-family: var(--font-mono); }
-.accent { color: var(--accent); }
-.dim { color: var(--text-dim); }
+.accent { color: var(--accent-2); }
+.dim { color: var(--text-mute); }
 
 .phase-note {
   margin-top: 6px;
-  padding: 12px 16px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--warn);
-  color: var(--text-dim);
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(240,183,93,0.08) 0%, rgba(240,183,93,0.02) 100%);
+  border: 1px solid rgba(240,183,93,0.20);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 12px; line-height: 1.55;
 }
 .phase-note b { color: var(--warn); font-family: var(--font-mono); letter-spacing: 1.5px; }
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .grid { grid-template-columns: 1fr; }
+  .card { padding: 16px; }
+  .verdict { font-size: 16px; }
+  table { font-size: 11px; }
+  th, td { padding: 6px 8px; }
+}
 </style>

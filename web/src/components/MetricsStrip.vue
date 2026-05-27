@@ -45,25 +45,32 @@ const METRICS = computed(() => [
 <style scoped>
 .strip {
   display: flex;
-  background: var(--bg-0);
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--panel-from);
   border-bottom: 1px solid var(--border);
-  height: 34px;
-  padding: 0 20px;
+  padding: 10px 24px;
   align-items: center;
   flex-shrink: 0;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding-right: 22px;
-  margin-right: 20px;
-  border-right: 1px solid var(--border);
-  height: 22px;
+  padding: 5px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
 }
-.cell:last-child { border-right: none; }
+.cell:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
 .k {
-  color: var(--text-dim);
+  color: var(--text-mute);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -73,5 +80,6 @@ const METRICS = computed(() => [
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.3px;
 }
 </style>
