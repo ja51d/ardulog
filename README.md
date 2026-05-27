@@ -11,7 +11,7 @@ never leaves your browser.
 
 ## Features
 
-### 🗺️ Visualize
+### Visualize
 - **SUMMARY** — log overview with frame type, duration, message counts
 - **PLOT** — searchable message tree, multi-series overlay, CSV export
 - **MAP** — 2D satellite view with altitude-colored track, mission waypoints, and geofence overlay
@@ -19,7 +19,7 @@ never leaves your browser.
 - **3D** — orbit-able trajectory with airplane / quadcopter models, spinning propellers, vibration-heatmap toggle
 - **COCKPIT** — attitude indicator, HSI, altitude / airspeed tapes, RC sticks, wind compass
 
-### 🔬 Analyze
+###  Analyze
 - **COPILOT** — AI flight Q&A (Google Gemini 2.5 Flash). Ask "Why was my battery sagging?" and get pilot-grade answers grounded in your log
 - **FFT** — vibration spectrum per IMU axis with peak frequency detection
 - **PID TUNING** — commanded vs actual roll / pitch / yaw overlay
@@ -27,12 +27,12 @@ never leaves your browser.
 - **BATTERY** — voltage / current / mAh consumption with sag detection
 - **REVIEW** — automated 14+ factor health assessment (incidents, EKF, GPS, vibration, etc.)
 
-### 💾 Data
+###  Data
 - **REPORT** — comprehensive multi-section flight report with PNG / PDF export
 - **PARAMS** — searchable parameter dump
 - **INFO** — raw log metadata
 
-### 🎮 Playback
+###  Playback
 - Synced play/pause/scrub across 3D, Terrain, Cockpit
 - Speed control 0.5× → 8×
 - Color-banded **flight timeline** showing mode segments + events (failsafes, arms, landings)
