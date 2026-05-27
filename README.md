@@ -1,11 +1,11 @@
-# 🛩️ Ardulog
+# Ardulog
 
 **Browser-based ArduPilot flight log analyzer.** Drop a `.bin` / `.tlog` / `.log`,
 get a full diagnostic suite — 3D playback on real satellite terrain, AI-powered
 insights, FFT, PID tuning, battery analysis, PDF reports. 100% local — your log
 never leaves your browser.
 
-🌐 **Live at [ardulog.app](https://ardulog.app)**
+🌐 [ardulog.app](https://ardulog.app)
 
 ---
 
